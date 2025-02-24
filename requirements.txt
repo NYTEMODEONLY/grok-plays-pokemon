@@ -1,0 +1,8 @@
+pyboy==1.5.4
+flask==2.3.3
+flask-socketio==5.3.6
+eventlet==0.33.3
+pillow==10.0.0
+numpy==1.24.3
+requests==2.31.0
+python-dotenv==1.0.0 

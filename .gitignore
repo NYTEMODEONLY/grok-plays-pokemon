@@ -1,0 +1,48 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+ENV/
+env/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Game ROMs (do not distribute these)
+roms/*.gb
+roms/*.gbc
+roms/*.zip
+
+# Logs
+logs/
+*.log
+
+# Screenshots
+static/screenshots/*.png
+
+# Miscellaneous
+.DS_Store
+Thumbs.db 

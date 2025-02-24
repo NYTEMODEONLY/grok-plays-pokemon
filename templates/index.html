@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grok Plays Pokémon</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header class="text-center my-4">
+            <h1 class="display-4">Grok Plays Pokémon</h1>
+            <p class="lead">Watch as Grok AI plays through Pokémon Red autonomously!</p>
+        </header>
+
+        <div class="row">
+            <!-- Game Screen Section -->
+            <div class="col-md-8">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h2>Game Screen</h2>
+                    </div>
+                    <div class="card-body text-center">
+                        <div class="game-screen-container">
+                            <img id="game-screen" src="{{ url_for('static', filename='img/loading.png') }}" alt="Game Screen" class="img-fluid">
+                        </div>
+                        <div id="controls" class="mt-3">
+                            <button id="start-button" class="btn btn-success me-2">Start Game</button>
+                            <button id="stop-button" class="btn btn-danger" disabled>Stop Game</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stats and Commentary Section -->
+            <div class="col-md-4">
+                <!-- Game Stats -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h2>Game Stats</h2>
+                    </div>
+                    <div class="card-body">
+                        <div id="game-stats">
+                            <div class="status-indicator">
+                                Status: <span id="game-status">Not initialized</span>
+                            </div>
+                            <div class="mt-3">
+                                <h4>Pokémon Team</h4>
+                                <ul id="pokemon-team" class="list-group">
+                                    <li class="list-group-item text-center">No Pokémon yet</li>
+                                </ul>
+                            </div>
+                            <div class="mt-3">
+                                <h4>Items</h4>
+                                <ul id="items-list" class="list-group">
+                                    <li class="list-group-item text-center">No items yet</li>
+                                </ul>
+                            </div>
+                            <div class="mt-3">
+                                <div><strong>Location:</strong> <span id="location">Unknown</span></div>
+                                <div><strong>Badges:</strong> <span id="badges">0</span></div>
+                                <div><strong>Money:</strong> <span id="money">0</span>₽</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Grok's Commentary -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h2>Grok's Commentary</h2>
+                    </div>
+                    <div class="card-body">
+                        <div id="commentary" class="commentary-box">
+                            <p class="commentary-item">Waiting for Grok to start commenting...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <footer class="text-center my-4">
+            <p>Grok Plays Pokémon &copy; 2025 | <a href="https://github.com/your-username/grok-plays-pokemon" target="_blank">GitHub</a></p>
+        </footer>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html> 
