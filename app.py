@@ -24,6 +24,14 @@ ROM_DIRECTORY = 'roms'
 ROM_FILE = 'pokemon_red.gb'  # User must provide this
 SCREENSHOT_INTERVAL = 1.0  # seconds between screenshots
 
+# AI settings
+AI_SETTINGS = {
+    "playerAI": "grok",
+    "pokemonAI": "claude",
+    "mode": "dual",
+    "currentAI": "Grok"  # Currently active AI (changes in dual mode)
+}
+
 # Create directories if they don't exist
 os.makedirs(ROM_DIRECTORY, exist_ok=True)
 os.makedirs('static/screenshots', exist_ok=True)
@@ -73,8 +81,22 @@ def game_loop():
                     if emulator.frame_count % 30 == 0:  # Every 30 frames (roughly 0.5 seconds)
                         emulator.update_game_state()
                         
+                        # Update current AI based on mode and game state
+                        if AI_SETTINGS["mode"] == "dual":
+                            # This is a simplified check - in a real implementation,
+                            # you would check the game state to determine if in battle
+                            in_battle = emulator.detect_game_screen() == "battle"
+                            if in_battle:
+                                AI_SETTINGS["currentAI"] = "Claude" if AI_SETTINGS["pokemonAI"] == "claude" else "Grok"
+                            else:
+                                AI_SETTINGS["currentAI"] = "Grok" if AI_SETTINGS["playerAI"] == "grok" else "Claude"
+                        else:  # single mode
+                            # Use only the player AI for everything
+                            AI_SETTINGS["currentAI"] = "Grok" if AI_SETTINGS["playerAI"] == "grok" else "Claude"
+                        
                         # Push updated state to clients
                         state = emulator.get_state()
+                        state["currentAI"] = AI_SETTINGS["currentAI"]  # Add current AI to state
                         socketio.emit('state_update', state)
             
             # Sleep to control game loop frequency
@@ -128,6 +150,35 @@ def stop_game_threads():
     game_running = False
     logger.info("Game threads stopping...")
 
+def update_ai_settings(settings):
+    """Update the AI settings."""
+    global AI_SETTINGS
+    
+    if "playerAI" in settings:
+        AI_SETTINGS["playerAI"] = settings["playerAI"]
+    
+    if "pokemonAI" in settings:
+        AI_SETTINGS["pokemonAI"] = settings["pokemonAI"]
+    
+    if "mode" in settings:
+        AI_SETTINGS["mode"] = settings["mode"]
+    
+    # Set the initial current AI based on the player AI
+    if AI_SETTINGS["mode"] == "single":
+        AI_SETTINGS["currentAI"] = "Grok" if AI_SETTINGS["playerAI"] == "grok" else "Claude"
+    
+    # Broadcast the updated settings to all clients
+    socketio.emit('ai_settings_update', {
+        "success": True,
+        "playerAI": AI_SETTINGS["playerAI"],
+        "pokemonAI": AI_SETTINGS["pokemonAI"],
+        "mode": AI_SETTINGS["mode"],
+        "currentAI": AI_SETTINGS["currentAI"]
+    })
+    
+    logger.info(f"AI settings updated: {AI_SETTINGS}")
+    return AI_SETTINGS
+
 @app.route('/')
 def index():
     """Render the main page."""
@@ -157,6 +208,7 @@ def get_state():
     
     with emulator_lock:
         state = emulator.get_state()
+        state["currentAI"] = AI_SETTINGS["currentAI"]  # Add current AI to state
         return jsonify(state)
 
 @app.route('/api/screenshot')
@@ -176,6 +228,35 @@ def get_screenshot():
         img_io.seek(0)
         
         return Response(img_io.getvalue(), mimetype='image/png')
+
+@app.route('/api/ai_settings', methods=['GET', 'POST'])
+def ai_settings():
+    """API endpoint to get or update AI settings."""
+    global AI_SETTINGS
+    
+    if request.method == 'GET':
+        # Return current settings
+        return jsonify({
+            "success": True,
+            "playerAI": AI_SETTINGS["playerAI"],
+            "pokemonAI": AI_SETTINGS["pokemonAI"],
+            "mode": AI_SETTINGS["mode"],
+            "currentAI": AI_SETTINGS["currentAI"]
+        })
+    elif request.method == 'POST':
+        # Update settings
+        data = request.json
+        if not data:
+            return jsonify({"success": False, "error": "Invalid request, no data provided"})
+        
+        updated_settings = update_ai_settings(data)
+        return jsonify({
+            "success": True,
+            "playerAI": updated_settings["playerAI"],
+            "pokemonAI": updated_settings["pokemonAI"],
+            "mode": updated_settings["mode"],
+            "currentAI": updated_settings["currentAI"]
+        })
 
 @app.route('/api/execute_action', methods=['POST'])
 def execute_action():
@@ -284,6 +365,15 @@ def handle_connect():
     """Handle client connect event."""
     logger.info("Client connected")
     emit('commentary_update', {"text": "Connected to Grok Plays Pokémon!"})
+    
+    # Send current AI settings to the newly connected client
+    emit('ai_settings_update', {
+        "success": True,
+        "playerAI": AI_SETTINGS["playerAI"],
+        "pokemonAI": AI_SETTINGS["pokemonAI"],
+        "mode": AI_SETTINGS["mode"],
+        "currentAI": AI_SETTINGS["currentAI"]
+    })
 
 @socketio.on('disconnect')
 def handle_disconnect():

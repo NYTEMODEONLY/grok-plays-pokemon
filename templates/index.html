@@ -12,7 +12,7 @@
     <div class="container">
         <header class="text-center my-4">
             <h1 class="display-4">Grok Plays Pokémon</h1>
-            <p class="lead">Watch as Grok AI plays through Pokémon Red autonomously!</p>
+            <p class="lead">Watch as AI plays through Pokémon Red autonomously!</p>
         </header>
 
         <div class="row">
@@ -26,6 +26,46 @@
                         <div class="game-screen-container">
                             <img id="game-screen" src="{{ url_for('static', filename='img/loading.png') }}" alt="Game Screen" class="img-fluid">
                         </div>
+                        
+                        <!-- AI Selection Controls -->
+                        <div id="ai-controls" class="mt-3 mb-3 p-3 border rounded bg-light position-relative">
+                            <h4>AI Selection</h4>
+                            <div class="row g-3 align-items-center">
+                                <div class="col-md-4">
+                                    <label for="player-ai" class="form-label">Player AI:</label>
+                                    <select id="player-ai" class="form-select">
+                                        <option value="grok" selected>Grok</option>
+                                        <option value="claude">Claude 3.7 Sonnet</option>
+                                    </select>
+                                    <small class="form-text">Controls player movement and exploration</small>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="pokemon-ai" class="form-label">Pokémon AI:</label>
+                                    <select id="pokemon-ai" class="form-select">
+                                        <option value="grok">Grok</option>
+                                        <option value="claude" selected>Claude 3.7 Sonnet</option>
+                                    </select>
+                                    <small class="form-text">Controls Pokémon during battles</small>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="ai-mode" class="form-label">Mode:</label>
+                                    <select id="ai-mode" class="form-select">
+                                        <option value="single">Single AI</option>
+                                        <option value="dual" selected>Dual AI</option>
+                                    </select>
+                                    <small class="form-text">Choose how AIs control the game</small>
+                                </div>
+                            </div>
+                            <div class="mt-3 form-text">
+                                <div class="mode-description">
+                                    <p class="mb-1"><strong>Single AI Mode:</strong> The selected Player AI controls both exploration and battles</p>
+                                    <p class="mb-1"><strong>Dual AI Mode:</strong> Player AI controls exploration, Pokémon AI takes over during battles</p>
+                                    <p class="mb-0 fst-italic text-muted">Toggle between modes to see different AI play styles and strategies!</p>
+                                </div>
+                            </div>
+                            <button id="apply-ai-settings" class="btn btn-primary mt-2">Apply AI Settings</button>
+                        </div>
+                        
                         <div id="controls" class="mt-3">
                             <button id="start-button" class="btn btn-success me-2">Start Game</button>
                             <button id="stop-button" class="btn btn-danger" disabled>Stop Game</button>
@@ -45,6 +85,12 @@
                         <div id="game-stats">
                             <div class="status-indicator">
                                 Status: <span id="game-status">Not initialized</span>
+                            </div>
+                            <div class="mt-3">
+                                <h4>Current AI</h4>
+                                <div id="current-ai" class="ai-indicator">
+                                    <span id="active-ai-name">None</span>
+                                </div>
                             </div>
                             <div class="mt-3">
                                 <h4>Pokémon Team</h4>
@@ -67,14 +113,14 @@
                     </div>
                 </div>
 
-                <!-- Grok's Commentary -->
+                <!-- AI Commentary -->
                 <div class="card mb-4">
                     <div class="card-header">
-                        <h2>Grok's Commentary</h2>
+                        <h2>AI Commentary</h2>
                     </div>
                     <div class="card-body">
                         <div id="commentary" class="commentary-box">
-                            <p class="commentary-item">Waiting for Grok to start commenting...</p>
+                            <p class="commentary-item">Waiting for AI to start commenting...</p>
                         </div>
                     </div>
                 </div>
@@ -82,7 +128,7 @@
         </div>
 
         <footer class="text-center my-4">
-            <p>Grok Plays Pokémon &copy; 2025 | <a href="https://github.com/your-username/grok-plays-pokemon" target="_blank">GitHub</a></p>
+            <p>Grok Plays Pokémon &copy; 2025 | <a href="https://github.com/NYTEMODEONLY/grok-plays-pokemon" target="_blank">GitHub</a></p>
         </footer>
     </div>
 

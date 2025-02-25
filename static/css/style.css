@@ -44,6 +44,30 @@ h1, h2, h3, h4 {
     font-weight: bold;
 }
 
+/* AI Indicator Styles */
+.ai-indicator {
+    padding: 10px;
+    border-radius: 5px;
+    margin-bottom: 15px;
+    font-weight: bold;
+    font-size: 1.1rem;
+    text-align: center;
+    background-color: #f8f9fa;
+    transition: all 0.3s ease;
+}
+
+.grok-active {
+    background-color: #e6f7ff;
+    border-left: 5px solid #1890ff;
+    color: #0062cc;
+}
+
+.claude-active {
+    background-color: #f6ffed;
+    border-left: 5px solid #52c41a;
+    color: #389e0d;
+}
+
 /* Commentary Box Styles */
 .commentary-box {
     height: 300px;
@@ -60,6 +84,17 @@ h1, h2, h3, h4 {
     background-color: #f8f9fa;
     border-radius: 5px;
     border-left: 3px solid #007bff;
+}
+
+/* AI-specific Commentary Styles */
+.grok-commentary {
+    background-color: #e6f7ff;
+    border-left: 3px solid #1890ff;
+}
+
+.claude-commentary {
+    background-color: #f6ffed;
+    border-left: 3px solid #52c41a;
 }
 
 /* Pokemon Team Styles */
@@ -105,6 +140,50 @@ h1, h2, h3, h4 {
     margin-top: 15px;
 }
 
+#ai-controls {
+    background-color: #f8f9fa;
+    border: 1px solid #ddd;
+    transition: all 0.3s ease-in-out;
+}
+
+/* Styles for Single/Dual mode */
+#ai-controls.single-mode {
+    border-left: 4px solid #007bff;
+}
+
+#ai-controls.dual-mode {
+    border-left: 4px solid #28a745;
+}
+
+/* Style for disabled settings in single mode */
+.disabled-setting {
+    opacity: 0.6;
+}
+
+/* Mode indicator badges */
+#ai-controls::before {
+    content: "";
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: bold;
+}
+
+#ai-controls.single-mode::before {
+    content: "Single AI Mode";
+    background-color: #cfe2ff;
+    color: #0d6efd;
+}
+
+#ai-controls.dual-mode::before {
+    content: "Dual AI Mode";
+    background-color: #d1e7dd;
+    color: #198754;
+}
+
 /* Responsive Adjustments */
 @media (max-width: 768px) {
     .col-md-8, .col-md-4 {
@@ -113,6 +192,14 @@ h1, h2, h3, h4 {
     
     .commentary-box {
         height: 200px;
+    }
+    
+    #ai-controls .row {
+        flex-direction: column;
+    }
+    
+    #ai-controls .col-md-4 {
+        margin-bottom: 10px;
     }
 }
 
