@@ -43,6 +43,13 @@ logs/
 # Screenshots
 static/screenshots/*.png
 
+# Environment variables
+.env
+.env.local
+
 # Miscellaneous
 .DS_Store
-Thumbs.db 
+Thumbs.db
+
+# Vercel
+.vercel 

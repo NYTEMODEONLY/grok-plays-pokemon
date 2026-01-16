@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grok Plays Pokémon</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <style>
+        body {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            color: #fff;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+        }
+        .container { max-width: 1200px; }
+        h1, h2, h3 { color: #fff; }
+        .card {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            backdrop-filter: blur(10px);
+        }
+        .card-header {
+            background: rgba(0,0,0,0.2);
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .game-container {
+            background: #000;
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+        }
+        #game-canvas {
+            max-width: 100%;
+            height: auto;
+            image-rendering: pixelated;
+            border: 3px solid #333;
+            border-radius: 5px;
+        }
+        .playtime-display {
+            background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 100%);
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            border: 1px solid rgba(0,255,136,0.3);
+        }
+        .playtime-counter {
+            font-family: 'Courier New', monospace;
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #00ff88;
+            text-shadow: 0 0 20px rgba(0,255,136,0.5);
+        }
+        .stats-label {
+            color: #888;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .pokemon-card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 8px;
+            padding: 10px;
+            margin-bottom: 8px;
+        }
+        .hp-bar {
+            height: 6px;
+            background: #333;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        .hp-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00ff88, #00cc6a);
+            transition: width 0.3s;
+        }
+        .hp-fill.low { background: linear-gradient(90deg, #ff4444, #cc0000); }
+        .hp-fill.medium { background: linear-gradient(90deg, #ffaa00, #ff8800); }
+        .commentary-box {
+            height: 300px;
+            overflow-y: auto;
+            background: rgba(0,0,0,0.3);
+            border-radius: 8px;
+            padding: 15px;
+        }
+        .commentary-item {
+            background: rgba(255,255,255,0.05);
+            border-left: 3px solid #00ff88;
+            padding: 8px 12px;
+            margin-bottom: 8px;
+            border-radius: 0 5px 5px 0;
+            font-size: 0.9rem;
+        }
+        .badge-icon {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            margin: 0 3px;
+        }
+        .badge-icon.earned {
+            background: linear-gradient(135deg, #ffd700, #ffaa00);
+            box-shadow: 0 0 8px rgba(255,215,0,0.5);
+        }
+        .badge-icon.not-earned {
+            background: #333;
+            opacity: 0.3;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+        .status-badge.running {
+            background: linear-gradient(135deg, #00ff88, #00cc6a);
+            color: #000;
+        }
+        .status-badge.stopped {
+            background: #ff4444;
+            color: #fff;
+        }
+        .btn-grok {
+            background: linear-gradient(135deg, #00ff88, #00cc6a);
+            border: none;
+            color: #000;
+            font-weight: bold;
+            padding: 12px 30px;
+            border-radius: 25px;
+            transition: all 0.3s;
+        }
+        .btn-grok:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 20px rgba(0,255,136,0.5);
+        }
+        .api-status {
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .api-status.connected {
+            background: rgba(0,255,136,0.2);
+            color: #00ff88;
+            border: 1px solid rgba(0,255,136,0.3);
+        }
+        .api-status.disconnected {
+            background: rgba(255,68,68,0.2);
+            color: #ff4444;
+            border: 1px solid rgba(255,68,68,0.3);
+        }
+        .api-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: currentColor;
+        }
+        .upload-zone {
+            border: 2px dashed rgba(255,255,255,0.3);
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .upload-zone:hover {
+            border-color: #00ff88;
+            background: rgba(0,255,136,0.05);
+        }
+        .upload-zone.has-rom {
+            border-color: #00ff88;
+            background: rgba(0,255,136,0.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="container py-4">
+        <header class="text-center mb-4">
+            <h1 class="display-4 mb-2">Grok Plays Pokémon</h1>
+            <p class="lead text-muted">Watch AI play Pokemon autonomously</p>
+            <div id="api-status" class="api-status disconnected">
+                <span class="api-dot"></span>
+                <span id="api-status-text">Checking API...</span>
+            </div>
+        </header>
+
+        <div class="row g-4">
+            <!-- Game Screen -->
+            <div class="col-lg-8">
+                <div class="card mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h2 class="h5 mb-0">Game Screen</h2>
+                        <span id="game-status" class="status-badge stopped">Stopped</span>
+                    </div>
+                    <div class="card-body">
+                        <!-- ROM Upload -->
+                        <div id="upload-section" class="mb-4">
+                            <div class="upload-zone" id="upload-zone">
+                                <input type="file" id="rom-input" accept=".gb,.gbc" style="display:none">
+                                <h4>Upload Pokemon ROM</h4>
+                                <p class="text-muted mb-0">Click or drag & drop your .gb/.gbc file</p>
+                                <small class="text-muted">Pokemon Red, Blue, or Yellow</small>
+                            </div>
+                            <div id="rom-info" class="mt-2" style="display:none">
+                                <span class="text-success">✓ ROM loaded: </span>
+                                <span id="rom-name"></span>
+                            </div>
+                        </div>
+
+                        <!-- Emulator Canvas -->
+                        <div class="game-container" id="game-container" style="display:none">
+                            <div id="emulator-container">
+                                <!-- EmulatorJS will be loaded here -->
+                                <canvas id="game-canvas" width="160" height="144"></canvas>
+                            </div>
+                        </div>
+
+                        <!-- Controls -->
+                        <div class="text-center mt-4">
+                            <button id="start-btn" class="btn btn-grok me-2" disabled>
+                                Start Game
+                            </button>
+                            <button id="stop-btn" class="btn btn-outline-danger" disabled>
+                                Stop
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stats Panel -->
+            <div class="col-lg-4">
+                <!-- Playtime -->
+                <div class="playtime-display mb-4">
+                    <div class="stats-label">Playtime</div>
+                    <div class="playtime-counter" id="playtime">00:00:00</div>
+                    <div class="mt-2">
+                        <small>Actions: <strong id="total-actions">0</strong></small>
+                        <small class="ms-3">(<span id="actions-per-min">0</span>/min)</small>
+                    </div>
+                </div>
+
+                <!-- Pokemon Team -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h3 class="h6 mb-0">Pokémon Team</h3>
+                    </div>
+                    <div class="card-body" id="pokemon-team">
+                        <p class="text-muted text-center mb-0">No Pokémon yet</p>
+                    </div>
+                </div>
+
+                <!-- Game Info -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h3 class="h6 mb-0">Game Info</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-2">
+                            <span class="stats-label">Location</span>
+                            <div id="location">Unknown</div>
+                        </div>
+                        <div class="mb-2">
+                            <span class="stats-label">Badges</span>
+                            <div id="badges-display">
+                                <span id="badge-count">0</span>/8
+                                <div id="badge-icons" class="mt-1"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <span class="stats-label">Money</span>
+                            <div>₽<span id="money">0</span></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- AI Commentary -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="h6 mb-0">Grok's Thoughts</h3>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="commentary-box" id="commentary">
+                            <p class="text-muted text-center py-4">Waiting for Grok to start playing...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <footer class="text-center mt-4 py-3 text-muted">
+            <small>Grok Plays Pokémon | Powered by xAI</small>
+        </footer>
+    </div>
+
+    <!-- EmulatorJS -->
+    <script src="https://cdn.emulatorjs.org/stable/data/loader.js"></script>
+    <script src="/static/js/emulator.js"></script>
+
+    <script>
+        // State
+        let emulator = null;
+        let aiController = null;
+        let romData = null;
+        let playtimeInterval = null;
+        let startTime = null;
+
+        // Elements
+        const uploadZone = document.getElementById('upload-zone');
+        const romInput = document.getElementById('rom-input');
+        const romInfo = document.getElementById('rom-info');
+        const romName = document.getElementById('rom-name');
+        const gameContainer = document.getElementById('game-container');
+        const startBtn = document.getElementById('start-btn');
+        const stopBtn = document.getElementById('stop-btn');
+        const playtimeEl = document.getElementById('playtime');
+        const totalActionsEl = document.getElementById('total-actions');
+        const actionsPerMinEl = document.getElementById('actions-per-min');
+        const commentaryEl = document.getElementById('commentary');
+        const apiStatusEl = document.getElementById('api-status');
+        const apiStatusText = document.getElementById('api-status-text');
+
+        // Check API status
+        async function checkAPIStatus() {
+            try {
+                const res = await fetch('/api/health');
+                const data = await res.json();
+                if (data.api_configured) {
+                    apiStatusEl.className = 'api-status connected';
+                    apiStatusText.textContent = 'xAI API Connected';
+                } else {
+                    apiStatusEl.className = 'api-status disconnected';
+                    apiStatusText.textContent = 'API Key Not Set';
+                }
+            } catch (e) {
+                apiStatusEl.className = 'api-status disconnected';
+                apiStatusText.textContent = 'API Unavailable';
+            }
+        }
+
+        // ROM Upload
+        uploadZone.addEventListener('click', () => romInput.click());
+        uploadZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadZone.classList.add('has-rom');
+        });
+        uploadZone.addEventListener('dragleave', () => {
+            if (!romData) uploadZone.classList.remove('has-rom');
+        });
+        uploadZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            const file = e.dataTransfer.files[0];
+            if (file) handleROMFile(file);
+        });
+        romInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) handleROMFile(file);
+        });
+
+        function handleROMFile(file) {
+            if (!file.name.match(/\.(gb|gbc)$/i)) {
+                alert('Please select a .gb or .gbc file');
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                romData = e.target.result;
+                romName.textContent = file.name;
+                romInfo.style.display = 'block';
+                uploadZone.classList.add('has-rom');
+                startBtn.disabled = false;
+                addCommentary('ROM loaded: ' + file.name);
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        // Start/Stop
+        startBtn.addEventListener('click', startGame);
+        stopBtn.addEventListener('click', stopGame);
+
+        async function startGame() {
+            if (!romData) return;
+
+            gameContainer.style.display = 'block';
+            startBtn.disabled = true;
+            stopBtn.disabled = false;
+            document.getElementById('game-status').className = 'status-badge running';
+            document.getElementById('game-status').textContent = 'Running';
+
+            // Initialize EmulatorJS
+            EJS_player = '#emulator-container';
+            EJS_gameUrl = URL.createObjectURL(new Blob([romData]));
+            EJS_core = 'gambatte';
+            EJS_pathtodata = 'https://cdn.emulatorjs.org/stable/data/';
+
+            // Start playtime counter
+            startTime = Date.now();
+            playtimeInterval = setInterval(updatePlaytime, 1000);
+
+            // Initialize AI controller
+            emulator = new BrowserEmulator('game-canvas');
+            aiController = new BrowserAIController(emulator, '/api/action');
+
+            aiController.onCommentary = addCommentary;
+            aiController.onAction = (action, commentary, confidence) => {
+                totalActionsEl.textContent = aiController.totalActions;
+            };
+
+            // Wait for emulator to load, then start AI
+            setTimeout(() => {
+                emulator.isRunning = true;
+                aiController.start();
+            }, 3000);
+
+            addCommentary('Game starting...');
+        }
+
+        function stopGame() {
+            if (aiController) aiController.stop();
+            if (playtimeInterval) clearInterval(playtimeInterval);
+
+            startBtn.disabled = false;
+            stopBtn.disabled = true;
+            document.getElementById('game-status').className = 'status-badge stopped';
+            document.getElementById('game-status').textContent = 'Stopped';
+
+            addCommentary('Game stopped.');
+        }
+
+        function updatePlaytime() {
+            if (!startTime) return;
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            const h = Math.floor(elapsed / 3600);
+            const m = Math.floor((elapsed % 3600) / 60);
+            const s = elapsed % 60;
+            playtimeEl.textContent = `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
+
+            // Update actions per minute
+            const mins = elapsed / 60;
+            if (aiController && mins > 0) {
+                actionsPerMinEl.textContent = (aiController.totalActions / mins).toFixed(1);
+            }
+        }
+
+        function addCommentary(text) {
+            const item = document.createElement('div');
+            item.className = 'commentary-item';
+            item.textContent = text;
+            commentaryEl.appendChild(item);
+            commentaryEl.scrollTop = commentaryEl.scrollHeight;
+
+            // Keep only last 50 items
+            while (commentaryEl.children.length > 50) {
+                commentaryEl.removeChild(commentaryEl.firstChild);
+            }
+        }
+
+        function updateBadgeIcons(count) {
+            const container = document.getElementById('badge-icons');
+            container.innerHTML = '';
+            for (let i = 0; i < 8; i++) {
+                const badge = document.createElement('span');
+                badge.className = 'badge-icon ' + (i < count ? 'earned' : 'not-earned');
+                container.appendChild(badge);
+            }
+        }
+
+        // Initialize
+        checkAPIStatus();
+        updateBadgeIcons(0);
+    </script>
+</body>
+</html>

@@ -11,6 +11,7 @@ const locationEl = document.getElementById('location');
 const badgesEl = document.getElementById('badges');
 const moneyEl = document.getElementById('money');
 const commentaryEl = document.getElementById('commentary');
+const actionLogEl = document.getElementById('action-log');
 const startButton = document.getElementById('start-button');
 const stopButton = document.getElementById('stop-button');
 const applyAISettingsButton = document.getElementById('apply-ai-settings');
@@ -18,13 +19,241 @@ const playerAISelect = document.getElementById('player-ai');
 const pokemonAISelect = document.getElementById('pokemon-ai');
 const aiModeSelect = document.getElementById('ai-mode');
 
+// ROM Upload Elements
+const romFileInput = document.getElementById('rom-file');
+const uploadRomBtn = document.getElementById('upload-rom-btn');
+const clearRomBtn = document.getElementById('clear-rom-btn');
+const uploadStatus = document.getElementById('upload-status');
+const currentRomInfo = document.getElementById('current-rom-info');
+const currentRomName = document.getElementById('current-rom-name');
+const romStatus = document.getElementById('rom-status');
+
 // Game state
 let gameRunning = false;
+let isAutonomous = false;
+let playtimeInterval = null;
+let localPlaytimeSeconds = 0;
 let currentAISettings = {
     playerAI: 'grok',
     pokemonAI: 'claude',
     mode: 'dual'
 };
+
+// Playtime Elements
+const playtimeDisplay = document.getElementById('playtime-display');
+const totalActionsEl = document.getElementById('total-actions');
+const actionsPerMinuteEl = document.getElementById('actions-per-minute');
+const autonomousBadge = document.getElementById('autonomous-badge');
+
+// ROM Upload Functions
+function uploadRom() {
+    const file = romFileInput.files[0];
+    if (!file) {
+        showUploadStatus('Please select a ROM file first.', 'warning');
+        return;
+    }
+
+    // Check file size (5MB limit)
+    const maxSize = 5 * 1024 * 1024; // 5MB in bytes
+    if (file.size > maxSize) {
+        showUploadStatus(`File is too large. Maximum size is 5MB. Your file is ${(file.size / 1024 / 1024).toFixed(2)}MB.`, 'danger');
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('rom', file);
+
+    uploadRomBtn.disabled = true;
+    uploadRomBtn.textContent = 'Uploading...';
+    showUploadStatus(`Uploading ROM... (${(file.size / 1024 / 1024).toFixed(2)}MB)`, 'info');
+
+    fetch('/api/upload_rom', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => {
+        if (!response.ok) {
+            if (response.status === 413) {
+                throw new Error('File is too large for the server. Please try a smaller file or contact the administrator.');
+            }
+            throw new Error(`Server error: ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.success) {
+            showUploadStatus(`Successfully uploaded ${data.rom_name}! (${(data.file_size / 1024 / 1024).toFixed(2)}MB)`, 'success');
+            updateRomInfo(data.rom_name, 'Ready');
+            addCommentary(`ROM uploaded: ${data.rom_name}`);
+        } else {
+            showUploadStatus(data.error, 'danger');
+        }
+    })
+    .catch(error => {
+        console.error('Error uploading ROM:', error);
+        showUploadStatus(error.message || 'Error uploading ROM. Please try again.', 'danger');
+    })
+    .finally(() => {
+        uploadRomBtn.disabled = false;
+        uploadRomBtn.textContent = 'Upload ROM';
+    });
+}
+
+function clearRom() {
+    fetch('/api/upload_rom', {
+        method: 'DELETE'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            updateRomInfo(null, 'No ROM');
+            showUploadStatus('ROM cleared successfully.', 'success');
+            addCommentary('ROM cleared');
+        } else {
+            showUploadStatus(data.error, 'danger');
+        }
+    })
+    .catch(error => {
+        console.error('Error clearing ROM:', error);
+        showUploadStatus('Error clearing ROM. Please try again.', 'danger');
+    });
+}
+
+function showUploadStatus(message, type) {
+    uploadStatus.innerHTML = `<div class="alert alert-${type} mt-2">${message}</div>`;
+    setTimeout(() => {
+        uploadStatus.innerHTML = '';
+    }, 5000);
+}
+
+function updateRomInfo(romName, status) {
+    if (romName) {
+        currentRomName.textContent = romName;
+        romStatus.textContent = status;
+        currentRomInfo.style.display = 'block';
+    } else {
+        currentRomInfo.style.display = 'none';
+    }
+}
+
+// Playtime Functions
+function formatPlaytime(seconds) {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+}
+
+function updatePlaytimeDisplay() {
+    if (gameRunning) {
+        localPlaytimeSeconds++;
+        if (playtimeDisplay) {
+            playtimeDisplay.textContent = formatPlaytime(localPlaytimeSeconds);
+        }
+    }
+}
+
+function startPlaytimeCounter() {
+    if (!playtimeInterval) {
+        playtimeInterval = setInterval(updatePlaytimeDisplay, 1000);
+    }
+}
+
+function stopPlaytimeCounter() {
+    if (playtimeInterval) {
+        clearInterval(playtimeInterval);
+        playtimeInterval = null;
+    }
+}
+
+function fetchGameplayStats() {
+    fetch('/api/gameplay_stats')
+        .then(response => response.json())
+        .then(data => {
+            // Sync playtime with server
+            localPlaytimeSeconds = data.playtime_seconds;
+            if (playtimeDisplay) {
+                playtimeDisplay.textContent = data.playtime_formatted;
+            }
+
+            // Update stats
+            if (totalActionsEl) {
+                totalActionsEl.textContent = data.total_actions;
+            }
+            if (actionsPerMinuteEl) {
+                actionsPerMinuteEl.textContent = data.actions_per_minute.toFixed(1);
+            }
+
+            // Update autonomous badge
+            isAutonomous = data.is_autonomous;
+            if (autonomousBadge) {
+                autonomousBadge.style.display = isAutonomous ? 'inline-block' : 'none';
+            }
+
+            // Update API status
+            updateAPIStatus(data.api_available);
+        })
+        .catch(error => {
+            console.error('Error fetching gameplay stats:', error);
+        });
+}
+
+function updateAPIStatus(isAvailable) {
+    const apiStatusEl = document.getElementById('api-status');
+    const apiStatusText = document.getElementById('api-status-text');
+
+    if (apiStatusEl) {
+        apiStatusEl.style.display = 'flex';
+
+        if (isAvailable) {
+            apiStatusEl.className = 'api-status connected';
+            if (apiStatusText) apiStatusText.textContent = 'xAI API: Connected';
+        } else {
+            apiStatusEl.className = 'api-status disconnected';
+            if (apiStatusText) apiStatusText.textContent = 'xAI API: Not configured (set XAI_API_KEY)';
+        }
+    }
+}
+
+// Action Log Functions
+function fetchActionLog() {
+    fetch('/api/action_log')
+        .then(response => response.json())
+        .then(data => {
+            updateActionLog(data);
+        })
+        .catch(error => {
+            console.error('Error fetching action log:', error);
+        });
+}
+
+function updateActionLog(actions) {
+    if (!actions || actions.length === 0) {
+        actionLogEl.innerHTML = '<p class="action-log-item">Waiting for actions...</p>';
+        return;
+    }
+
+    actionLogEl.innerHTML = '';
+    // Show last 20 actions
+    const recentActions = actions.slice(-20);
+
+    recentActions.forEach(action => {
+        const actionItem = document.createElement('p');
+        actionItem.className = 'action-log-item';
+
+        const timestamp = new Date(action.timestamp * 1000);
+        const timeString = timestamp.toLocaleTimeString();
+
+        actionItem.innerHTML = `
+            <small class="text-muted">${timeString}</small><br>
+            <strong>${action.action.toUpperCase()}</strong>
+            ${action.commentary ? `<br><em>${action.commentary}</em>` : ''}
+        `;
+        actionLogEl.appendChild(actionItem);
+    });
+
+    actionLogEl.scrollTop = actionLogEl.scrollHeight; // Auto-scroll to bottom
+}
 
 // Initialize the page
 function initializePage() {
@@ -37,14 +266,30 @@ function initializePage() {
                 updateControlButtons();
                 fetchGameState();
                 fetchCommentary();
+                fetchActionLog();
                 fetchAISettings();
+                fetchGameplayStats();
+                startPlaytimeCounter();
+            } else {
+                // Still fetch gameplay stats to check API status
+                fetchGameplayStats();
+            }
+
+            // Start periodic stats updates
+            setInterval(fetchGameplayStats, 5000);
+
+            // Update ROM info
+            if (data.rom_info && data.rom_info.rom_exists) {
+                updateRomInfo(data.rom_info.rom_name, 'Ready');
+            } else {
+                updateRomInfo(null, 'No ROM');
             }
         })
         .catch(error => {
             console.error('Error checking game status:', error);
             addCommentary('Error connecting to server. Please try again later.');
         });
-    
+
     // Load initial AI settings from localStorage if available
     loadAISettings();
 }
@@ -288,6 +533,12 @@ function fetchCommentary() {
         });
 }
 
+// Fetch both commentary and action log
+function fetchCommentaryAndActions() {
+    fetchCommentary();
+    fetchActionLog();
+}
+
 // Update control buttons based on game state
 function updateControlButtons() {
     if (gameRunning) {
@@ -310,12 +561,17 @@ function startGame() {
         .then(data => {
             if (data.success) {
                 gameRunning = true;
+                localPlaytimeSeconds = 0;
                 updateControlButtons();
-                
+                startPlaytimeCounter();
+
                 // Apply the current AI settings when starting
                 applyAISettings();
-                
-                addCommentary('Game started! Waiting for AI to make the first move...');
+
+                // Start fetching stats periodically
+                setInterval(fetchGameplayStats, 5000);
+
+                addCommentary('Game started! Grok is now playing Pokemon autonomously...');
             } else {
                 addCommentary(`Error starting game: ${data.error}`);
             }
@@ -333,6 +589,7 @@ function stopGame() {
         .then(data => {
             if (data.success) {
                 gameRunning = false;
+                stopPlaytimeCounter();
                 updateControlButtons();
                 addCommentary('Game stopped.');
             }
@@ -360,18 +617,64 @@ socket.on('screenshot_update', (data) => {
 socket.on('state_update', (data) => {
     updatePokemonTeam(data.pokemon_team);
     updateItemsList(data.items);
-    locationEl.textContent = data.location;
-    badgesEl.textContent = data.badges;
-    moneyEl.textContent = data.money;
-    
+    locationEl.textContent = data.location || 'Unknown';
+    badgesEl.textContent = data.badges || 0;
+    moneyEl.textContent = (data.money || 0).toLocaleString();
+
+    // Update badge icons
+    updateBadgeIcons(data.badges || 0);
+
+    // Update battle info
+    updateBattleInfo(data.in_battle, data.enemy);
+
     // Update active AI if provided
     if (data.currentAI) {
         updateActiveAIDisplay(data.currentAI);
     }
 });
 
+// Update badge icons display
+function updateBadgeIcons(badgeCount) {
+    const badgeIconsEl = document.getElementById('badge-icons');
+    if (badgeIconsEl) {
+        let icons = '';
+        for (let i = 0; i < 8; i++) {
+            const earned = i < badgeCount ? 'earned' : 'not-earned';
+            icons += `<span class="badge-icon ${earned}"></span>`;
+        }
+        badgeIconsEl.innerHTML = icons;
+    }
+}
+
+// Update battle info display
+function updateBattleInfo(inBattle, enemy) {
+    const battleInfoEl = document.getElementById('battle-info');
+    const enemyNameEl = document.getElementById('enemy-name');
+    const enemyLevelEl = document.getElementById('enemy-level');
+
+    if (battleInfoEl) {
+        if (inBattle && enemy) {
+            battleInfoEl.style.display = 'block';
+            if (enemyNameEl) enemyNameEl.textContent = enemy.name || '???';
+            if (enemyLevelEl) enemyLevelEl.textContent = enemy.level || '?';
+        } else {
+            battleInfoEl.style.display = 'none';
+        }
+    }
+}
+
 socket.on('commentary_update', (data) => {
     addCommentary(data.text);
+    // Also update action log when commentary is received
+    fetchActionLog();
+});
+
+socket.on('action_update', (data) => {
+    // Update action count in real-time
+    if (totalActionsEl) {
+        const currentCount = parseInt(totalActionsEl.textContent) || 0;
+        totalActionsEl.textContent = currentCount + 1;
+    }
 });
 
 socket.on('ai_settings_update', (data) => {
@@ -392,6 +695,10 @@ socket.on('ai_settings_update', (data) => {
 startButton.addEventListener('click', startGame);
 stopButton.addEventListener('click', stopGame);
 applyAISettingsButton.addEventListener('click', applyAISettings);
+
+// ROM upload event listeners
+uploadRomBtn.addEventListener('click', uploadRom);
+clearRomBtn.addEventListener('click', clearRom);
 
 // Add event listener for mode change to update UI immediately
 aiModeSelect.addEventListener('change', updateAIModeDisplay);

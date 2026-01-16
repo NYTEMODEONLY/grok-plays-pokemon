@@ -12,12 +12,38 @@
     <div class="container">
         <header class="text-center my-4">
             <h1 class="display-4">Grok Plays Pokémon</h1>
-            <p class="lead">Watch as AI plays through Pokémon Red autonomously!</p>
+            <p class="lead">Upload any Pokemon ROM and watch AI play through Red, Blue, or Yellow autonomously!</p>
         </header>
 
         <div class="row">
             <!-- Game Screen Section -->
             <div class="col-md-8">
+                <!-- ROM Upload Section -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h2>ROM Upload</h2>
+                    </div>
+                    <div class="card-body">
+                        <div id="rom-upload-section">
+                            <div class="mb-3">
+                                <label for="rom-file" class="form-label">Upload Pokemon ROM (Red, Blue, or Yellow)</label>
+                                <input class="form-control" type="file" id="rom-file" accept=".gb,.gbc">
+                                <div class="form-text">Only .gb and .gbc files are supported. Maximum size: 5MB.</div>
+                            </div>
+                            <button id="upload-rom-btn" class="btn btn-primary me-2">Upload ROM</button>
+                            <button id="clear-rom-btn" class="btn btn-outline-secondary">Clear ROM</button>
+                            <div id="upload-status" class="mt-2"></div>
+                        </div>
+                        <div id="current-rom-info" class="mt-3" style="display: none;">
+                            <div class="alert alert-success">
+                                <h5>Current ROM: <span id="current-rom-name"></span></h5>
+                                <p class="mb-0">Status: <span id="rom-status">Ready</span></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Game Screen Section -->
                 <div class="card mb-4">
                     <div class="card-header">
                         <h2>Game Screen</h2>
@@ -86,10 +112,26 @@
                             <div class="status-indicator">
                                 Status: <span id="game-status">Not initialized</span>
                             </div>
+                            <div id="api-status" class="api-status mt-2" style="display: none;">
+                                <span class="api-status-icon"></span>
+                                <span id="api-status-text">API: Checking...</span>
+                            </div>
+
+                            <!-- Playtime Display -->
+                            <div class="playtime-display mt-3">
+                                <h4>Playtime</h4>
+                                <div class="playtime-counter" id="playtime-display">00:00:00</div>
+                                <div class="playtime-stats">
+                                    <small>Actions: <span id="total-actions">0</span></small>
+                                    <small class="ms-2">(<span id="actions-per-minute">0</span>/min)</small>
+                                </div>
+                            </div>
+
                             <div class="mt-3">
                                 <h4>Current AI</h4>
                                 <div id="current-ai" class="ai-indicator">
-                                    <span id="active-ai-name">None</span>
+                                    <span id="active-ai-name">Grok</span>
+                                    <span class="autonomous-badge" id="autonomous-badge" style="display: none;">AUTO</span>
                                 </div>
                             </div>
                             <div class="mt-3">
@@ -106,9 +148,29 @@
                             </div>
                             <div class="mt-3">
                                 <div><strong>Location:</strong> <span id="location">Unknown</span></div>
-                                <div><strong>Badges:</strong> <span id="badges">0</span></div>
-                                <div><strong>Money:</strong> <span id="money">0</span>₽</div>
+                                <div><strong>Badges:</strong> <span id="badges">0</span>/8 <span id="badge-icons"></span></div>
+                                <div><strong>Money:</strong> ₽<span id="money">0</span></div>
                             </div>
+
+                            <!-- Battle Info (shown when in battle) -->
+                            <div id="battle-info" class="mt-3 battle-info-box" style="display: none;">
+                                <h4>Battle!</h4>
+                                <div class="enemy-pokemon">
+                                    <strong>Enemy:</strong> <span id="enemy-name">???</span> Lv<span id="enemy-level">?</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Action Log -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h2>Action Log</h2>
+                    </div>
+                    <div class="card-body">
+                        <div id="action-log" class="action-log-box" style="max-height: 200px; overflow-y: auto;">
+                            <p class="action-log-item">Waiting for actions...</p>
                         </div>
                     </div>
                 </div>
