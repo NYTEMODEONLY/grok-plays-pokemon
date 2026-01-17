@@ -32,14 +32,11 @@ def get_game_action(api_key: str, image_base64: str, game_state: GameState) -> d
         Dict with action, commentary, confidence
     """
 
-    # For loading screens, don't even call the AI
-    if game_state.screen_type == 'loading' and game_state.screen_confidence > 0.7:
-        return {
-            "action": "wait",
-            "commentary": "Screen is loading/transitioning - waiting",
-            "confidence": 0.9,
-            "screen_type": "loading"
-        }
+    # NOTE: Removed early-return for 'loading' screens because:
+    # 1. Client-side detection may fail (WebGL canvas issues) and misclassify screens
+    # 2. The screenshot sent to the AI is correct, so let AI vision decide
+    # 3. AI can detect actual loading/black screens from the image itself
+    # Previously: if screen_type == 'loading' and confidence > 0.7: return wait
 
     # Load the appropriate prompt for this screen type
     screen_prompt = load_prompt(game_state.screen_type)
