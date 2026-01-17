@@ -1,156 +1,304 @@
 """
-Vercel Serverless Function: Get AI Action
-POST /api/action - Returns the next game action from Grok
+Grok Plays Pokemon - Action API
+
+Receives preprocessed game state (screen type, OCR text) from frontend
+and returns appropriate action using screen-specific prompts.
 """
 
+from http.server import BaseHTTPRequestHandler
 import os
 import json
 import re
+import urllib.request
+import urllib.error
 
-def get_game_action(client, image_base64, game_state, recent_actions=None):
-    """Get game action from Grok AI."""
-    system_prompt = """You are Grok, an AI playing Pokemon Red/Blue/Yellow on a Game Boy. Your goal is to complete the game.
+# Import game state utilities
+try:
+    from .game_state import GameState, load_prompt, build_user_message
+except ImportError:
+    from game_state import GameState, load_prompt, build_user_message
 
-Available buttons: a, b, up, down, left, right, start, select
 
-Guidelines:
-- Look at the screen carefully
-- In menus, navigate before pressing A
-- Consider type advantages in battles
-- Don't get stuck in loops - try different approaches
-- Talk to NPCs, explore, catch Pokemon
+def get_game_action(api_key: str, image_base64: str, game_state: GameState) -> dict:
+    """
+    Get game action from xAI Grok using screen-specific prompts.
 
-Respond with JSON only:
-{"action": "button", "commentary": "brief reason", "confidence": 0.0-1.0}"""
+    Args:
+        api_key: xAI API key
+        image_base64: Base64 encoded screenshot
+        game_state: GameState object with preprocessing results
 
-    user_parts = ["Current game state:"]
-    if game_state:
-        if game_state.get("location"):
-            user_parts.append(f"Location: {game_state['location']}")
-        if game_state.get("pokemon_team"):
-            team = ", ".join([f"{p['name']} Lv{p['level']}" for p in game_state['pokemon_team'][:3]])
-            user_parts.append(f"Team: {team}")
-        if game_state.get("badges") is not None:
-            user_parts.append(f"Badges: {game_state['badges']}/8")
+    Returns:
+        Dict with action, commentary, confidence
+    """
 
-    if recent_actions:
-        user_parts.append(f"Recent: {' '.join(recent_actions[-5:])}")
+    # For loading screens, don't even call the AI
+    if game_state.screen_type == 'loading' and game_state.screen_confidence > 0.7:
+        return {
+            "action": "wait",
+            "commentary": "Screen is loading/transitioning - waiting",
+            "confidence": 0.9,
+            "screen_type": "loading"
+        }
 
-    user_parts.append("Decide next action (JSON only):")
+    # Load the appropriate prompt for this screen type
+    screen_prompt = load_prompt(game_state.screen_type)
+
+    # Build compact system prompt
+    system_prompt = f"""You are playing Pokemon Red/Blue/Yellow. Analyze the screenshot and choose an action.
+
+{screen_prompt}
+
+CONTROLS: a, b, up, down, left, right, start, select
+OUTPUT: JSON only - {{"action": "<button>", "commentary": "<what you see and why>", "confidence": <0.0-1.0>}}"""
+
+    # Build user message with context
+    user_message = build_user_message(game_state)
 
     try:
-        response = client.chat.completions.create(
-            model="grok-2-vision-1212",
-            messages=[
+        # Build request payload - much smaller than before
+        payload = {
+            "model": "grok-2-vision-latest",
+            "messages": [
                 {"role": "system", "content": system_prompt},
                 {
                     "role": "user",
                     "content": [
-                        {"type": "text", "text": "\n".join(user_parts)},
-                        {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{image_base64}"}}
+                        {"type": "text", "text": user_message},
+                        {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{image_base64}", "detail": "high"}}
                     ]
                 }
             ],
-            max_tokens=200,
-            temperature=0.7
+            "max_tokens": 150,
+            "temperature": 0.1  # Lower temperature for more consistent responses
+        }
+
+        # Make API request
+        req = urllib.request.Request(
+            "https://api.x.ai/v1/chat/completions",
+            data=json.dumps(payload).encode('utf-8'),
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {api_key}",
+                "User-Agent": "GrokPlaysPokemon/2.0",
+                "Accept": "application/json"
+            }
         )
 
-        text = response.choices[0].message.content.strip()
+        with urllib.request.urlopen(req, timeout=12) as response:
+            result = json.loads(response.read().decode('utf-8'))
 
-        # Parse JSON
+        text = result['choices'][0]['message']['content'].strip()
+
+        # Parse JSON response
+        data = None
         if text.startswith('{'):
-            data = json.loads(text)
-        else:
-            match = re.search(r'\{[^{}]+\}', text)
-            data = json.loads(match.group()) if match else {"action": "a"}
+            try:
+                data = json.loads(text)
+            except json.JSONDecodeError:
+                pass
 
-        action = data.get("action", "a").lower()
-        if action not in ["a", "b", "up", "down", "left", "right", "start", "select"]:
-            action = "a"
+        if not data:
+            # Try to extract JSON from response
+            match = re.search(r'\{[^{}]+\}', text)
+            if match:
+                try:
+                    data = json.loads(match.group())
+                except json.JSONDecodeError:
+                    pass
+
+        if not data:
+            return {
+                "action": "wait",
+                "commentary": "Could not parse AI response",
+                "confidence": 0.0,
+                "retry": True,
+                "raw_response": text[:200]
+            }
+
+        # Extract and validate action
+        action = data.get("action", "").lower()
+        commentary = data.get("commentary", "")
+        confidence = float(data.get("confidence", 0.5))
+
+        # Validate action
+        valid_actions = ["a", "b", "up", "down", "left", "right", "start", "select", "wait"]
+        if action not in valid_actions:
+            return {
+                "action": "wait",
+                "commentary": f"Invalid action '{action}' returned",
+                "confidence": 0.0,
+                "retry": True
+            }
+
+        # Validate against game state
+        validation = game_state.validate_action(action)
+        if not validation['valid']:
+            return {
+                "action": validation.get('suggested_action', 'wait'),
+                "commentary": f"Validation failed: {validation['reason']}",
+                "confidence": 0.3,
+                "original_action": action,
+                "validation_override": True
+            }
+
+        # Check for empty commentary (sign AI didn't actually analyze)
+        if not commentary or len(commentary) < 3:
+            return {
+                "action": "wait",
+                "commentary": "No analysis provided by AI",
+                "confidence": 0.0,
+                "retry": True
+            }
+
+        # Detect if AI is describing wrong screen type
+        ai_screen_type = detect_screen_from_commentary(commentary)
+        if ai_screen_type and game_state.screen_confidence > 0.8:
+            if ai_screen_type != game_state.screen_type:
+                # Screen type mismatch - AI might be hallucinating
+                return {
+                    "action": "wait",
+                    "commentary": f"Screen mismatch: detected {game_state.screen_type}, AI said {ai_screen_type}",
+                    "confidence": 0.2,
+                    "retry": True,
+                    "mismatch": True
+                }
 
         return {
             "action": action,
-            "commentary": data.get("commentary", "Making a move..."),
-            "confidence": min(1.0, max(0.0, float(data.get("confidence", 0.5))))
+            "commentary": commentary,
+            "confidence": min(1.0, max(0.0, confidence)),
+            "screen_type": game_state.screen_type
         }
+
+    except urllib.error.HTTPError as e:
+        error_body = ""
+        try:
+            error_body = e.read().decode('utf-8')
+        except:
+            pass
+        print(f"xAI HTTP Error: {e.code} - {error_body}")
+
+        if e.code == 429:
+            return {"action": "wait", "commentary": "Rate limited - waiting", "confidence": 0.0, "retry": True}
+        elif e.code >= 500:
+            return {"action": "wait", "commentary": "Server error - waiting", "confidence": 0.0, "retry": True}
+        return {"action": "wait", "commentary": f"API Error {e.code}", "confidence": 0.0, "retry": True}
+
+    except urllib.error.URLError as e:
+        print(f"xAI URL Error: {e.reason}")
+        return {"action": "wait", "commentary": "Connection error", "confidence": 0.0, "retry": True}
+
+    except json.JSONDecodeError:
+        return {"action": "wait", "commentary": "JSON parse error", "confidence": 0.0, "retry": True}
 
     except Exception as e:
-        return {"action": "a", "commentary": f"Error: {str(e)[:50]}", "confidence": 0.0}
+        import traceback
+        print(f"Error: {traceback.format_exc()}")
+        return {"action": "wait", "commentary": f"Error: {str(e)[:50]}", "confidence": 0.0, "retry": True}
 
 
-def handler(request):
-    """Vercel serverless handler."""
-    # Handle CORS
-    if request.method == "OPTIONS":
-        return {
-            "statusCode": 200,
-            "headers": {
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "POST, OPTIONS",
-                "Access-Control-Allow-Headers": "Content-Type"
-            }
-        }
+def detect_screen_from_commentary(commentary: str) -> str | None:
+    """
+    Try to detect what screen type the AI thinks it's looking at from its commentary.
 
-    if request.method != "POST":
-        return {
-            "statusCode": 405,
-            "body": json.dumps({"error": "Method not allowed"})
-        }
+    Returns screen type string or None if can't determine.
+    """
+    if not commentary:
+        return None
 
-    # Check API key
-    api_key = os.getenv('XAI_API_KEY')
-    if not api_key:
-        return {
-            "statusCode": 200,
-            "headers": {"Content-Type": "application/json", "Access-Control-Allow-Origin": "*"},
-            "body": json.dumps({
-                "action": "a",
+    commentary_lower = commentary.lower()
+
+    # Look for screen type keywords
+    if any(word in commentary_lower for word in ['title screen', 'press start', 'pokemon logo']):
+        return 'title'
+
+    if any(word in commentary_lower for word in ['dialog', 'dialogue', 'text box', 'talking', 'speaking']):
+        return 'dialog'
+
+    if any(word in commentary_lower for word in ['battle', 'fighting', 'hp bar', 'attack', 'fight menu']):
+        if 'move' in commentary_lower and ('select' in commentary_lower or 'choosing' in commentary_lower):
+            return 'battle_move_select'
+        return 'battle'
+
+    if any(word in commentary_lower for word in ['menu', 'pokemon menu', 'item menu', 'save', 'option']):
+        return 'menu'
+
+    if any(word in commentary_lower for word in ['overworld', 'walking', 'route', 'town', 'city']):
+        return 'overworld'
+
+    if any(word in commentary_lower for word in ['name entry', 'naming', 'letter grid', 'keyboard']):
+        return 'name_entry'
+
+    if 'yes' in commentary_lower and 'no' in commentary_lower:
+        return 'yes_no'
+
+    return None
+
+
+class handler(BaseHTTPRequestHandler):
+    def do_OPTIONS(self):
+        self.send_response(200)
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+        self.end_headers()
+
+    def do_POST(self):
+        # Check API key
+        api_key = os.getenv('XAI_API_KEY', '').strip()
+        if not api_key:
+            self._send_json_response({
+                "action": "wait",
                 "commentary": "xAI API key not configured",
                 "confidence": 0.0,
-                "error": "XAI_API_KEY not set"
+                "error": "XAI_API_KEY not set",
+                "retry": False
             })
-        }
+            return
 
-    try:
-        from openai import OpenAI
-        client = OpenAI(api_key=api_key, base_url="https://api.x.ai/v1")
-    except ImportError:
-        return {
-            "statusCode": 200,
-            "headers": {"Content-Type": "application/json", "Access-Control-Allow-Origin": "*"},
-            "body": json.dumps({
-                "action": "a",
-                "commentary": "OpenAI package not available",
-                "confidence": 0.0,
-                "error": "Missing dependency"
-            })
-        }
+        # Parse request body
+        content_length = int(self.headers.get('Content-Length', 0))
+        body = self.rfile.read(content_length)
 
-    # Parse request
-    try:
-        body = json.loads(request.body) if hasattr(request, 'body') else {}
-    except:
-        body = {}
+        try:
+            data = json.loads(body) if body else {}
+        except json.JSONDecodeError:
+            data = {}
 
-    screenshot = body.get('screenshot', '')
-    game_state = body.get('game_state', {})
-    recent_actions = body.get('recent_actions', [])
-
-    if not screenshot:
-        return {
-            "statusCode": 200,
-            "headers": {"Content-Type": "application/json", "Access-Control-Allow-Origin": "*"},
-            "body": json.dumps({
-                "action": "a",
+        # Extract data
+        screenshot = data.get('screenshot', '')
+        if not screenshot:
+            self._send_json_response({
+                "action": "wait",
                 "commentary": "No screenshot provided",
-                "confidence": 0.0
+                "confidence": 0.0,
+                "retry": True
             })
+            return
+
+        # Build game state from frontend preprocessing
+        state_data = {
+            'screen_type': data.get('screen_type', 'unknown'),
+            'screen_confidence': data.get('screen_confidence', 0.0),
+            'ocr_text': data.get('ocr_text', ''),
+            'recent_actions': data.get('recent_actions', []),
+            'location': data.get('location', 'Unknown'),
+            'badges': data.get('badges', 0),
+            'pokemon_team': data.get('pokemon_team', []),
         }
 
-    result = get_game_action(client, screenshot, game_state, recent_actions)
+        game_state = GameState(state_data)
 
-    return {
-        "statusCode": 200,
-        "headers": {"Content-Type": "application/json", "Access-Control-Allow-Origin": "*"},
-        "body": json.dumps(result)
-    }
+        # Get AI action
+        result = get_game_action(api_key, screenshot, game_state)
+
+        self._send_json_response(result)
+
+    def _send_json_response(self, data: dict):
+        """Send JSON response with CORS headers."""
+        self.send_response(200)
+        self.send_header('Content-Type', 'application/json')
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.end_headers()
+        self.wfile.write(json.dumps(data).encode())

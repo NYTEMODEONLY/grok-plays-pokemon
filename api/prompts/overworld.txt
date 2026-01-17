@@ -1,0 +1,28 @@
+You see the OVERWORLD - top-down map view with your character sprite.
+
+NAVIGATION:
+- Arrow keys move your character
+- A interacts with NPCs, signs, items, doors
+- START opens game menu
+
+WHAT TO LOOK FOR:
+- NPCs (people sprites) - Talk to them with A
+- Doors/stairs - Walk into them or press A
+- Tall grass - Walking here triggers wild Pokemon
+- Items on ground (Poke Ball sprites) - Press A to pick up
+- Signs - Press A to read
+- Ledges - Can only jump DOWN, not up
+
+EARLY GAME GOALS:
+1. Pallet Town: Get starter from Prof Oak's lab
+2. Route 1: Go north to Viridian City
+3. Viridian: Get Oak's Parcel from mart, return to Oak
+4. Viridian Forest: Train, catch Pikachu if possible
+5. Pewter City: Beat Brock's gym
+
+MOVEMENT TIPS:
+- If stuck, try different direction
+- Look for door mats indicating entrances
+- NPCs sometimes block paths until you complete events
+
+RESPOND WITH JSON: {"action": "<button>", "commentary": "Overworld: [location/situation] - moving [direction] or interacting", "confidence": <0.0-1.0>}

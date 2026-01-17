@@ -3,8 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Grok Plays Pokémon</title>
+    <title>Grok Plays Pokemon</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <!-- Tesseract.js for OCR -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <style>
         body {
             background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
@@ -12,7 +14,7 @@
             color: #fff;
             font-family: 'Segoe UI', system-ui, sans-serif;
         }
-        .container { max-width: 1200px; }
+        .container { max-width: 1400px; }
         h1, h2, h3 { color: #fff; }
         .card {
             background: rgba(255,255,255,0.1);
@@ -26,15 +28,15 @@
         .game-container {
             background: #000;
             border-radius: 10px;
-            padding: 20px;
+            padding: 10px;
             text-align: center;
+            position: relative;
         }
-        #game-canvas {
-            max-width: 100%;
-            height: auto;
-            image-rendering: pixelated;
-            border: 3px solid #333;
-            border-radius: 5px;
+        #game {
+            width: 100%;
+            max-width: 640px;
+            height: 576px;
+            margin: 0 auto;
         }
         .playtime-display {
             background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 100%);
@@ -56,25 +58,6 @@
             text-transform: uppercase;
             letter-spacing: 1px;
         }
-        .pokemon-card {
-            background: rgba(255,255,255,0.05);
-            border-radius: 8px;
-            padding: 10px;
-            margin-bottom: 8px;
-        }
-        .hp-bar {
-            height: 6px;
-            background: #333;
-            border-radius: 3px;
-            overflow: hidden;
-        }
-        .hp-fill {
-            height: 100%;
-            background: linear-gradient(90deg, #00ff88, #00cc6a);
-            transition: width 0.3s;
-        }
-        .hp-fill.low { background: linear-gradient(90deg, #ff4444, #cc0000); }
-        .hp-fill.medium { background: linear-gradient(90deg, #ffaa00, #ff8800); }
         .commentary-box {
             height: 300px;
             overflow-y: auto;
@@ -90,10 +73,19 @@
             border-radius: 0 5px 5px 0;
             font-size: 0.9rem;
         }
+        .commentary-item.action {
+            border-left-color: #00aaff;
+        }
+        .commentary-item.error {
+            border-left-color: #ff4444;
+        }
+        .commentary-item.detection {
+            border-left-color: #ffaa00;
+        }
         .badge-icon {
             display: inline-block;
-            width: 20px;
-            height: 20px;
+            width: 24px;
+            height: 24px;
             border-radius: 50%;
             margin: 0 3px;
         }
@@ -115,10 +107,15 @@
         .status-badge.running {
             background: linear-gradient(135deg, #00ff88, #00cc6a);
             color: #000;
+            animation: pulse 2s infinite;
         }
         .status-badge.stopped {
             background: #ff4444;
             color: #fff;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
         }
         .btn-grok {
             background: linear-gradient(135deg, #00ff88, #00cc6a);
@@ -132,6 +129,12 @@
         .btn-grok:hover {
             transform: scale(1.05);
             box-shadow: 0 0 20px rgba(0,255,136,0.5);
+            color: #000;
+        }
+        .btn-grok:disabled {
+            background: #444;
+            transform: none;
+            box-shadow: none;
         }
         .api-status {
             padding: 8px 15px;
@@ -156,6 +159,11 @@
             height: 8px;
             border-radius: 50%;
             background: currentColor;
+            animation: blink 1s infinite;
+        }
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
         }
         .upload-zone {
             border: 2px dashed rgba(255,255,255,0.3);
@@ -173,13 +181,106 @@
             border-color: #00ff88;
             background: rgba(0,255,136,0.1);
         }
+        .action-display {
+            font-family: 'Courier New', monospace;
+            font-size: 1.5rem;
+            color: #00aaff;
+            text-align: center;
+            padding: 10px;
+            background: rgba(0,170,255,0.1);
+            border-radius: 8px;
+            margin-top: 10px;
+        }
+        .speed-control {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 15px;
+        }
+        .speed-control input[type="range"] {
+            width: 150px;
+        }
+
+        /* Debug overlay for screen detection */
+        .debug-overlay {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.85);
+            color: #0f0;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            padding: 8px 12px;
+            border-radius: 5px;
+            z-index: 100;
+            max-width: 250px;
+            border: 1px solid #0f0;
+        }
+        .debug-overlay.hidden {
+            display: none;
+        }
+        .debug-title {
+            font-weight: bold;
+            color: #0ff;
+            margin-bottom: 5px;
+            border-bottom: 1px solid #0f0;
+            padding-bottom: 3px;
+        }
+        .debug-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 2px 0;
+        }
+        .debug-label {
+            color: #888;
+        }
+        .debug-value {
+            color: #0f0;
+        }
+        .debug-value.warning {
+            color: #ff0;
+        }
+        .debug-value.error {
+            color: #f00;
+        }
+
+        /* OCR text preview */
+        .ocr-preview {
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid #333;
+            max-height: 60px;
+            overflow-y: auto;
+            font-size: 10px;
+            color: #aaa;
+        }
+
+        /* Toggle button */
+        .debug-toggle {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 101;
+            background: rgba(0,0,0,0.7);
+            border: 1px solid #555;
+            color: #fff;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            cursor: pointer;
+        }
+        .debug-toggle:hover {
+            background: rgba(0,0,0,0.9);
+            border-color: #0f0;
+        }
     </style>
 </head>
 <body>
     <div class="container py-4">
         <header class="text-center mb-4">
-            <h1 class="display-4 mb-2">Grok Plays Pokémon</h1>
-            <p class="lead text-muted">Watch AI play Pokemon autonomously</p>
+            <h1 class="display-4 mb-2">Grok Plays Pokemon</h1>
+            <p class="lead text-muted">Watch AI play Pokemon autonomously (v2.0 with OCR)</p>
             <div id="api-status" class="api-status disconnected">
                 <span class="api-dot"></span>
                 <span id="api-status-text">Checking API...</span>
@@ -196,7 +297,7 @@
                     </div>
                     <div class="card-body">
                         <!-- ROM Upload -->
-                        <div id="upload-section" class="mb-4">
+                        <div id="upload-section">
                             <div class="upload-zone" id="upload-zone">
                                 <input type="file" id="rom-input" accept=".gb,.gbc" style="display:none">
                                 <h4>Upload Pokemon ROM</h4>
@@ -204,27 +305,54 @@
                                 <small class="text-muted">Pokemon Red, Blue, or Yellow</small>
                             </div>
                             <div id="rom-info" class="mt-2" style="display:none">
-                                <span class="text-success">✓ ROM loaded: </span>
+                                <span class="text-success">ROM loaded: </span>
                                 <span id="rom-name"></span>
                             </div>
                         </div>
 
-                        <!-- Emulator Canvas -->
+                        <!-- Emulator Container -->
                         <div class="game-container" id="game-container" style="display:none">
-                            <div id="emulator-container">
-                                <!-- EmulatorJS will be loaded here -->
-                                <canvas id="game-canvas" width="160" height="144"></canvas>
+                            <button class="debug-toggle" id="debug-toggle">Debug</button>
+                            <div class="debug-overlay" id="debug-overlay">
+                                <div class="debug-title">Screen Detection</div>
+                                <div class="debug-row">
+                                    <span class="debug-label">Type:</span>
+                                    <span class="debug-value" id="debug-screen-type">-</span>
+                                </div>
+                                <div class="debug-row">
+                                    <span class="debug-label">Confidence:</span>
+                                    <span class="debug-value" id="debug-confidence">-</span>
+                                </div>
+                                <div class="debug-row">
+                                    <span class="debug-label">OCR Status:</span>
+                                    <span class="debug-value" id="debug-ocr-status">-</span>
+                                </div>
+                                <div class="debug-row">
+                                    <span class="debug-label">Last Action:</span>
+                                    <span class="debug-value" id="debug-last-action">-</span>
+                                </div>
+                                <div class="ocr-preview" id="debug-ocr-text">OCR text will appear here...</div>
+                            </div>
+                            <div id="game"></div>
+                            <div class="action-display">
+                                Last Action: <span id="last-action">-</span>
                             </div>
                         </div>
 
                         <!-- Controls -->
                         <div class="text-center mt-4">
                             <button id="start-btn" class="btn btn-grok me-2" disabled>
-                                Start Game
+                                Start AI Player
                             </button>
                             <button id="stop-btn" class="btn btn-outline-danger" disabled>
                                 Stop
                             </button>
+                        </div>
+
+                        <div class="speed-control">
+                            <label>AI Speed:</label>
+                            <input type="range" id="speed-slider" min="1" max="5" value="2">
+                            <span id="speed-label">Normal</span>
                         </div>
                     </div>
                 </div>
@@ -242,13 +370,20 @@
                     </div>
                 </div>
 
-                <!-- Pokemon Team -->
+                <!-- Screen Detection Info -->
                 <div class="card mb-4">
                     <div class="card-header">
-                        <h3 class="h6 mb-0">Pokémon Team</h3>
+                        <h3 class="h6 mb-0">Screen Detection</h3>
                     </div>
-                    <div class="card-body" id="pokemon-team">
-                        <p class="text-muted text-center mb-0">No Pokémon yet</p>
+                    <div class="card-body">
+                        <div class="mb-2">
+                            <span class="stats-label">Detected Screen</span>
+                            <div id="detected-screen">-</div>
+                        </div>
+                        <div class="mb-2">
+                            <span class="stats-label">OCR Text</span>
+                            <div id="ocr-text-display" style="font-size: 0.8rem; max-height: 60px; overflow-y: auto;">-</div>
+                        </div>
                     </div>
                 </div>
 
@@ -269,17 +404,14 @@
                                 <div id="badge-icons" class="mt-1"></div>
                             </div>
                         </div>
-                        <div>
-                            <span class="stats-label">Money</span>
-                            <div>₽<span id="money">0</span></div>
-                        </div>
                     </div>
                 </div>
 
                 <!-- AI Commentary -->
                 <div class="card">
-                    <div class="card-header">
+                    <div class="card-header d-flex justify-content-between align-items-center">
                         <h3 class="h6 mb-0">Grok's Thoughts</h3>
+                        <small class="text-muted" id="confidence-display">Confidence: -</small>
                     </div>
                     <div class="card-body p-0">
                         <div class="commentary-box" id="commentary">
@@ -291,28 +423,64 @@
         </div>
 
         <footer class="text-center mt-4 py-3 text-muted">
-            <small>Grok Plays Pokémon | Powered by xAI</small>
+            <small>Grok Plays Pokemon v2.0 | Powered by xAI Grok Vision + Client-side OCR</small>
         </footer>
     </div>
 
-    <!-- EmulatorJS -->
-    <script src="https://cdn.emulatorjs.org/stable/data/loader.js"></script>
-    <script src="/static/js/emulator.js"></script>
+    <!-- Load screen detector and OCR engine -->
+    <script src="/static/js/screen-detector.js"></script>
+    <script src="/static/js/ocr-engine.js"></script>
 
     <script>
-        // State
-        let emulator = null;
-        let aiController = null;
+        // Global state
         let romData = null;
-        let playtimeInterval = null;
+        let romUrl = null;
+        let aiRunning = false;
+        let aiInterval = null;
         let startTime = null;
+        let playtimeInterval = null;
+        let totalActions = 0;
+        let recentActions = [];
+        let ejsPlayer = null;
+
+        // Screen detection and OCR engines
+        let screenDetector = null;
+        let ocrEngine = null;
+        let lastScreenType = null;
+        let lastOCRText = '';
+        let ocrInProgress = false;
+
+        // Game state tracking
+        let gameState = {
+            location: 'Unknown',
+            badges: 0,
+            pokemon_team: []
+        };
+
+        // Speed settings (ms between actions)
+        const speedSettings = {
+            1: 8000,  // Slow
+            2: 5000,  // Normal
+            3: 3000,  // Fast
+            4: 2000,  // Very Fast
+            5: 1000   // Maximum
+        };
+        const speedLabels = {
+            1: 'Slow',
+            2: 'Normal',
+            3: 'Fast',
+            4: 'Very Fast',
+            5: 'Maximum'
+        };
+        let currentSpeed = 2;
 
         // Elements
         const uploadZone = document.getElementById('upload-zone');
         const romInput = document.getElementById('rom-input');
         const romInfo = document.getElementById('rom-info');
-        const romName = document.getElementById('rom-name');
+        const romNameEl = document.getElementById('rom-name');
         const gameContainer = document.getElementById('game-container');
+        const uploadSection = document.getElementById('upload-section');
         const startBtn = document.getElementById('start-btn');
         const stopBtn = document.getElementById('stop-btn');
         const playtimeEl = document.getElementById('playtime');
@@ -321,6 +489,39 @@
         const commentaryEl = document.getElementById('commentary');
         const apiStatusEl = document.getElementById('api-status');
         const apiStatusText = document.getElementById('api-status-text');
+        const lastActionEl = document.getElementById('last-action');
+        const confidenceEl = document.getElementById('confidence-display');
+        const speedSlider = document.getElementById('speed-slider');
+        const speedLabel = document.getElementById('speed-label');
+        const debugOverlay = document.getElementById('debug-overlay');
+        const debugToggle = document.getElementById('debug-toggle');
+
+        // Initialize detection engines
+        function initDetectionEngines() {
+            screenDetector = new ScreenDetector();
+            ocrEngine = new OCREngine();
+            ocrEngine.initialize().then(() => {
+                console.log('OCR Engine ready');
+                updateDebugDisplay('OCR Status', 'Ready', 'debug-ocr-status');
+            }).catch(err => {
+                console.warn('OCR initialization failed:', err);
+                updateDebugDisplay('OCR Status', 'Failed', 'debug-ocr-status', 'error');
+            });
+        }
+
+        // Debug toggle
+        debugToggle.addEventListener('click', () => {
+            debugOverlay.classList.toggle('hidden');
+        });
+
+        // Update debug display
+        function updateDebugDisplay(label, value, elementId, status = '') {
+            const el = document.getElementById(elementId);
+            if (el) {
+                el.textContent = value;
+                el.className = 'debug-value' + (status ? ' ' + status : '');
+            }
+        }
 
         // Check API status
         async function checkAPIStatus() {
@@ -330,17 +531,20 @@
                 if (data.api_configured) {
                     apiStatusEl.className = 'api-status connected';
                     apiStatusText.textContent = 'xAI API Connected';
+                    return true;
                 } else {
                     apiStatusEl.className = 'api-status disconnected';
                     apiStatusText.textContent = 'API Key Not Set';
+                    return false;
                 }
             } catch (e) {
                 apiStatusEl.className = 'api-status disconnected';
                 apiStatusText.textContent = 'API Unavailable';
+                return false;
             }
         }
 
-        // ROM Upload
+        // ROM Upload handlers
         uploadZone.addEventListener('click', () => romInput.click());
         uploadZone.addEventListener('dragover', (e) => {
             e.preventDefault();
@@ -367,7 +571,8 @@
             const reader = new FileReader();
             reader.onload = (e) => {
                 romData = e.target.result;
-                romName.textContent = file.name;
+                romUrl = URL.createObjectURL(new Blob([romData]));
+                romNameEl.textContent = file.name;
                 romInfo.style.display = 'block';
                 uploadZone.classList.add('has-rom');
                 startBtn.disabled = false;
@@ -376,13 +581,32 @@
             reader.readAsArrayBuffer(file);
         }
 
-        // Start/Stop
-        startBtn.addEventListener('click', startGame);
-        stopBtn.addEventListener('click', stopGame);
+        // Speed control
+        speedSlider.addEventListener('input', (e) => {
+            currentSpeed = parseInt(e.target.value);
+            speedLabel.textContent = speedLabels[currentSpeed];
 
-        async function startGame() {
+            if (aiRunning && aiInterval) {
+                clearInterval(aiInterval);
+                aiInterval = setInterval(aiGameLoop, speedSettings[currentSpeed]);
+            }
+        });
+
+        // Start game
+        startBtn.addEventListener('click', async () => {
             if (!romData) return;
 
+            const apiOk = await checkAPIStatus();
+            if (!apiOk) {
+                alert('xAI API is not configured. Please set XAI_API_KEY in Vercel environment variables.');
+                return;
+            }
+
+            // Initialize detection engines
+            initDetectionEngines();
+
+            // Hide upload, show game
+            uploadSection.style.display = 'none';
             gameContainer.style.display = 'block';
             startBtn.disabled = true;
             stopBtn.disabled = false;
@@ -390,35 +614,84 @@
             document.getElementById('game-status').textContent = 'Running';
 
             // Initialize EmulatorJS
-            EJS_player = '#emulator-container';
-            EJS_gameUrl = URL.createObjectURL(new Blob([romData]));
-            EJS_core = 'gambatte';
-            EJS_pathtodata = 'https://cdn.emulatorjs.org/stable/data/';
+            initEmulator();
 
             // Start playtime counter
             startTime = Date.now();
             playtimeInterval = setInterval(updatePlaytime, 1000);
 
-            // Initialize AI controller
-            emulator = new BrowserEmulator('game-canvas');
-            aiController = new BrowserAIController(emulator, '/api/action');
+            // Clear commentary
+            commentaryEl.innerHTML = '';
+            addCommentary('Initializing emulator...');
 
-            aiController.onCommentary = addCommentary;
-            aiController.onAction = (action, commentary, confidence) => {
-                totalActionsEl.textContent = aiController.totalActions;
-            };
+            // Wait for emulator to be fully ready
+            addCommentary('Waiting for emulator to initialize...');
+            waitForEmulator();
+        });
 
-            // Wait for emulator to load, then start AI
+        // Wait for EmulatorJS to be fully loaded
+        function waitForEmulator() {
+            const checkInterval = setInterval(() => {
+                if (typeof EJS_emulator !== 'undefined' &&
+                    EJS_emulator.gameManager &&
+                    typeof EJS_emulator.gameManager.simulateInput === 'function') {
+
+                    clearInterval(checkInterval);
+                    addCommentary('Emulator ready! Starting AI with screen detection...');
+                    aiRunning = true;
+                    aiInterval = setInterval(aiGameLoop, speedSettings[currentSpeed]);
+                } else {
+                    console.log('Waiting for EJS_emulator...', typeof EJS_emulator);
+                }
+            }, 500);
+
             setTimeout(() => {
-                emulator.isRunning = true;
-                aiController.start();
-            }, 3000);
-
-            addCommentary('Game starting...');
+                clearInterval(checkInterval);
+                if (!aiRunning) {
+                    addCommentary('Emulator initialization timeout. Please refresh and try again.', 'error');
+                }
+            }, 15000);
         }
 
-        function stopGame() {
-            if (aiController) aiController.stop();
+        // Initialize EmulatorJS
+        function initEmulator() {
+            document.getElementById('game').innerHTML = '';
+
+            window.EJS_player = '#game';
+            window.EJS_gameUrl = romUrl;
+            window.EJS_core = 'gambatte';
+            window.EJS_pathtodata = 'https://cdn.emulatorjs.org/stable/data/';
+            window.EJS_startOnLoaded = true;
+            window.EJS_volume = 0.5;
+            window.EJS_defaultControls = false;
+            window.EJS_Buttons = {
+                playPause: false,
+                restart: false,
+                mute: true,
+                settings: false,
+                fullscreen: true,
+                saveState: false,
+                loadState: false,
+                screenRecord: false,
+                gamepad: false,
+                cheat: false,
+                volume: true,
+                quickSave: false,
+                quickLoad: false,
+                screenshot: false,
+                cacheManager: false
+            };
+
+            const script = document.createElement('script');
+            script.src = 'https://cdn.emulatorjs.org/stable/data/loader.js';
+            script.onload = () => console.log('EmulatorJS loaded');
+            document.body.appendChild(script);
+        }
+
+        // Stop game
+        stopBtn.addEventListener('click', () => {
+            aiRunning = false;
+            if (aiInterval) clearInterval(aiInterval);
             if (playtimeInterval) clearInterval(playtimeInterval);
 
             startBtn.disabled = false;
@@ -426,9 +699,247 @@
             document.getElementById('game-status').className = 'status-badge stopped';
             document.getElementById('game-status').textContent = 'Stopped';
 
-            addCommentary('Game stopped.');
+            addCommentary('Grok stopped playing.');
+        });
+
+        // Get canvas from EmulatorJS
+        function getGameCanvas() {
+            let canvas = document.querySelector('#game canvas');
+            if (!canvas) {
+                const iframe = document.querySelector('#game iframe');
+                if (iframe && iframe.contentDocument) {
+                    canvas = iframe.contentDocument.querySelector('canvas');
+                }
+            }
+            return canvas;
         }
 
+        // Perform screen detection
+        function detectScreen(canvas) {
+            if (!screenDetector || !canvas) {
+                return { screenType: 'unknown', confidence: 0, features: {} };
+            }
+            return screenDetector.detect(canvas);
+        }
+
+        // Perform OCR (async, cached)
+        async function performOCR(canvas, screenType) {
+            if (!ocrEngine || !canvas || ocrInProgress) {
+                return lastOCRText;
+            }
+
+            // Only run OCR for text-heavy screens
+            const textScreens = ['dialog', 'menu', 'battle', 'battle_move_select', 'name_entry', 'yes_no'];
+            if (!textScreens.includes(screenType)) {
+                return '';
+            }
+
+            ocrInProgress = true;
+            try {
+                let result;
+                if (screenType === 'dialog') {
+                    result = await ocrEngine.extractDialogText(canvas);
+                } else if (screenType === 'battle' || screenType === 'battle_move_select') {
+                    result = await ocrEngine.extractBattleMenuText(canvas);
+                } else {
+                    result = await ocrEngine.extractText(canvas);
+                }
+
+                lastOCRText = result.text || '';
+
+                // Update debug display
+                document.getElementById('debug-ocr-text').textContent = lastOCRText || '(no text detected)';
+                document.getElementById('ocr-text-display').textContent = lastOCRText || '-';
+
+                return lastOCRText;
+            } catch (err) {
+                console.warn('OCR error:', err);
+                return '';
+            } finally {
+                ocrInProgress = false;
+            }
+        }
+
+        // Track consecutive failures
+        let consecutiveFailures = 0;
+        const MAX_RETRIES = 3;
+
+        // AI Game Loop
+        async function aiGameLoop() {
+            if (!aiRunning) return;
+
+            try {
+                const canvas = getGameCanvas();
+                if (!canvas) {
+                    console.log('Waiting for emulator canvas...');
+                    return;
+                }
+
+                // 1. Perform screen detection
+                const detection = detectScreen(canvas);
+                lastScreenType = detection.screenType;
+
+                // Update debug display
+                updateDebugDisplay('Type', detection.screenType, 'debug-screen-type');
+                updateDebugDisplay('Confidence', (detection.confidence * 100).toFixed(0) + '%', 'debug-confidence',
+                    detection.confidence < 0.5 ? 'warning' : '');
+                document.getElementById('detected-screen').textContent =
+                    `${detection.screenType} (${(detection.confidence * 100).toFixed(0)}%)`;
+
+                // 2. Perform OCR (async, non-blocking for next iteration)
+                const ocrText = await performOCR(canvas, detection.screenType);
+
+                // 3. Capture screenshot
+                let screenshot;
+                try {
+                    screenshot = canvas.toDataURL('image/png').split(',')[1];
+                } catch (canvasError) {
+                    console.error('Canvas capture error (CORS):', canvasError);
+                    addCommentary('Canvas capture failed (CORS)', 'error');
+                    consecutiveFailures++;
+                    return;
+                }
+
+                if (!screenshot || screenshot.length < 100) {
+                    addCommentary('Screenshot capture failed', 'error');
+                    consecutiveFailures++;
+                    return;
+                }
+
+                // 4. Call API with preprocessed data
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+                const response = await fetch('/api/action', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        screenshot: screenshot,
+                        screen_type: detection.screenType,
+                        screen_confidence: detection.confidence,
+                        ocr_text: ocrText,
+                        recent_actions: recentActions.slice(-10),
+                        location: gameState.location,
+                        badges: gameState.badges,
+                        pokemon_team: gameState.pokemon_team
+                    }),
+                    signal: controller.signal
+                });
+
+                clearTimeout(timeoutId);
+                const result = await response.json();
+
+                // Update debug
+                updateDebugDisplay('Last Action', result.action || 'wait', 'debug-last-action');
+
+                // Handle "wait" action
+                if (result.action === 'wait') {
+                    addCommentary(`[WAIT] ${result.commentary}`, 'detection');
+                    lastActionEl.textContent = 'WAITING';
+                    confidenceEl.textContent = 'Confidence: 0%';
+
+                    if (result.retry && consecutiveFailures < MAX_RETRIES) {
+                        consecutiveFailures++;
+                    }
+                    return;
+                }
+
+                // Handle errors
+                if (result.error) {
+                    addCommentary('API Error: ' + result.commentary, 'error');
+                    consecutiveFailures++;
+                    return;
+                }
+
+                // Validate action
+                const validActions = ['a', 'b', 'up', 'down', 'left', 'right', 'start', 'select'];
+                const action = result.action ? result.action.toLowerCase() : '';
+                const commentary = result.commentary || '';
+                const confidence = result.confidence || 0;
+
+                if (!validActions.includes(action)) {
+                    addCommentary(`Invalid action '${action}'`, 'error');
+                    consecutiveFailures++;
+                    return;
+                }
+
+                if (!commentary || commentary.length < 3) {
+                    addCommentary('No analysis provided', 'error');
+                    consecutiveFailures++;
+                    return;
+                }
+
+                // Reset failure counter on success
+                consecutiveFailures = 0;
+
+                // Execute action
+                const buttonPressed = pressButton(action);
+
+                // Update UI
+                lastActionEl.textContent = action.toUpperCase() + (buttonPressed ? '' : ' (failed)');
+                confidenceEl.textContent = `Confidence: ${Math.round(confidence * 100)}%`;
+                totalActions++;
+                totalActionsEl.textContent = totalActions;
+
+                // Track action
+                recentActions.push(action);
+                if (recentActions.length > 50) recentActions.shift();
+
+                // Add commentary with screen type
+                const screenInfo = result.screen_type ? `[${result.screen_type}]` : `[${detection.screenType}]`;
+                addCommentary(`${screenInfo} [${action.toUpperCase()}] ${commentary}`, 'action');
+
+            } catch (error) {
+                console.error('AI loop error:', error);
+                consecutiveFailures++;
+
+                if (error.name === 'AbortError') {
+                    addCommentary('Request timeout', 'error');
+                } else {
+                    addCommentary('Error: ' + error.message, 'error');
+                }
+                lastActionEl.textContent = 'ERROR';
+            }
+        }
+
+        // Button mapping for EmulatorJS
+        const buttonIndexMap = {
+            'a': 8,
+            'b': 0,
+            'start': 3,
+            'select': 2,
+            'up': 4,
+            'down': 5,
+            'left': 6,
+            'right': 7
+        };
+
+        function pressButton(button) {
+            const buttonIndex = buttonIndexMap[button.toLowerCase()];
+            if (buttonIndex === undefined) {
+                console.warn('Unknown button:', button);
+                return false;
+            }
+
+            if (typeof EJS_emulator === 'undefined' || !EJS_emulator.gameManager) {
+                console.warn('EmulatorJS not ready');
+                return false;
+            }
+
+            try {
+                EJS_emulator.gameManager.simulateInput(0, buttonIndex, true);
+                setTimeout(() => {
+                    EJS_emulator.gameManager.simulateInput(0, buttonIndex, false);
+                }, 150);
+                console.log(`Button pressed: ${button} (index ${buttonIndex})`);
+                return true;
+            } catch (e) {
+                console.error('Error pressing button:', e);
+                return false;
+            }
+        }
+
+        // Update playtime display
         function updatePlaytime() {
             if (!startTime) return;
             const elapsed = Math.floor((Date.now() - startTime) / 1000);
@@ -437,32 +948,39 @@
             const s = elapsed % 60;
             playtimeEl.textContent = `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
 
-            // Update actions per minute
             const mins = elapsed / 60;
-            if (aiController && mins > 0) {
-                actionsPerMinEl.textContent = (aiController.totalActions / mins).toFixed(1);
+            if (mins > 0) {
+                actionsPerMinEl.textContent = (totalActions / mins).toFixed(1);
             }
         }
 
-        function addCommentary(text) {
+        // Add commentary to log
+        function addCommentary(text, type = 'normal') {
+            const placeholder = commentaryEl.querySelector('p.text-muted');
+            if (placeholder) placeholder.remove();
+
             const item = document.createElement('div');
-            item.className = 'commentary-item';
-            item.textContent = text;
+            item.className = 'commentary-item' + (type !== 'normal' ? ' ' + type : '');
+
+            const time = new Date().toLocaleTimeString();
+            item.innerHTML = `<small class="text-muted">${time}</small> ${text}`;
+
             commentaryEl.appendChild(item);
             commentaryEl.scrollTop = commentaryEl.scrollHeight;
 
-            // Keep only last 50 items
-            while (commentaryEl.children.length > 50) {
+            while (commentaryEl.children.length > 100) {
                 commentaryEl.removeChild(commentaryEl.firstChild);
             }
         }
 
+        // Update badge icons
         function updateBadgeIcons(count) {
             const container = document.getElementById('badge-icons');
             container.innerHTML = '';
             for (let i = 0; i < 8; i++) {
                 const badge = document.createElement('span');
                 badge.className = 'badge-icon ' + (i < count ? 'earned' : 'not-earned');
+                badge.title = ['Boulder', 'Cascade', 'Thunder', 'Rainbow', 'Soul', 'Marsh', 'Volcano', 'Earth'][i];
                 container.appendChild(badge);
             }
         }

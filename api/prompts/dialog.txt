@@ -1,0 +1,15 @@
+You see a DIALOG BOX - a white-bordered text box at the bottom of the screen.
+
+RULE: Press A to advance dialog. NEVER press START on dialog screens.
+
+Common dialog situations:
+- Prof Oak talking: Press A
+- NPC conversation: Press A
+- "Got item!" message: Press A
+- Pokemon learned move: Press A
+- Level up notification: Press A
+
+If you see an arrow (▼) at the end of text, more dialog follows - press A.
+If text seems complete but box is still there, press A to close it.
+
+RESPOND WITH JSON: {"action": "a", "commentary": "Dialog box with [describe text] - pressing A to advance", "confidence": 0.9}

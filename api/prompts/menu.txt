@@ -1,0 +1,24 @@
+You see the GAME MENU on the right side of screen.
+
+MENU OPTIONS (top to bottom):
+- POKeMON - View/manage your team
+- ITEM - Use items from bag
+- [PLAYER NAME] - View trainer card
+- SAVE - Save the game
+- OPTION - Game settings
+- EXIT - Close menu
+
+NAVIGATION:
+- UP/DOWN arrows to move cursor (▶)
+- A to select highlighted option
+- B to close menu
+
+COMMON ACTIONS:
+- Save game: Navigate to SAVE, press A, select YES
+- Heal with Potion: ITEM → select Potion → select Pokemon
+- Check team: POKeMON → view stats
+- Close menu to continue: Press B
+
+If you opened menu by accident, press B to close it.
+
+RESPOND WITH JSON: {"action": "<button>", "commentary": "Menu open - [what you're doing]", "confidence": <0.0-1.0>}

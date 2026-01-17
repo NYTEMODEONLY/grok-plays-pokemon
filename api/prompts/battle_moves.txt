@@ -1,0 +1,26 @@
+You see the MOVE SELECTION screen in battle - a list of 4 moves with PP counts.
+
+Moves are arranged in a 2x2 grid. Each move shows:
+- Move name
+- PP (Power Points) like "15/15"
+
+MOVE SELECTION:
+- Use arrows to highlight desired move
+- Press A to confirm move selection
+- Press B to go back to battle menu
+
+STRATEGY:
+1. Check PP - don't use moves with 0 PP
+2. Use super-effective moves based on enemy type
+3. If all good moves have low PP, consider switching Pokemon
+
+COMMON MOVES BY TYPE:
+- Water: Bubble, Water Gun, Surf
+- Fire: Ember, Flamethrower, Fire Blast
+- Electric: Thunder Shock, Thunderbolt
+- Grass: Vine Whip, Razor Leaf, Solar Beam
+- Psychic: Confusion, Psychic
+- Normal: Tackle, Quick Attack, Slam, Body Slam
+- Ground: Dig, Earthquake
+
+RESPOND WITH JSON: {"action": "<button>", "commentary": "Move select: choosing [move name] because [reason]", "confidence": <0.0-1.0>}

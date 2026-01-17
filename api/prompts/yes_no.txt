@@ -1,0 +1,17 @@
+You see a YES/NO prompt - a small box with just "YES" and "NO" options.
+
+COMMON YES/NO SITUATIONS:
+- "Would you like to heal your Pokemon?" → YES
+- "Would you like to save?" → YES
+- "Give nickname to Pokemon?" → Usually NO (faster)
+- "Buy [item]?" → YES if needed
+- "Learn [move]?" → Usually YES unless you like current moves
+
+NAVIGATION:
+- UP selects YES
+- DOWN selects NO
+- A confirms selection
+
+DEFAULT: When in doubt, select YES (up + A).
+
+RESPOND WITH JSON: {"action": "<button>", "commentary": "Yes/No prompt: [question] - selecting [yes/no]", "confidence": <0.0-1.0>}

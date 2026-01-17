@@ -1,0 +1,11 @@
+Screen type could not be determined with confidence.
+
+FALLBACK STRATEGY:
+1. If there's a white box at bottom → likely dialog, try A
+2. If screen looks like a map → likely overworld, try moving
+3. If menu visible on right → likely menu, try B to close or A to select
+4. If mostly dark → likely loading, wait
+
+When truly uncertain, press A - it's the most common action needed.
+
+RESPOND WITH JSON: {"action": "a", "commentary": "Unknown screen - trying A (most common action)", "confidence": 0.3}

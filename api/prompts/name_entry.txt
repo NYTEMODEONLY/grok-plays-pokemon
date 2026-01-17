@@ -1,0 +1,24 @@
+You see the NAME ENTRY screen.
+
+TWO TYPES OF NAME SCREENS:
+
+1. NAME PRESET LIST:
+   Shows options like: NEW NAME, RED, ASH, JACK (or BLUE, GARY, JOHN for rival)
+   ACTION: Select a preset name (NOT "NEW NAME") - press A
+
+2. NAME ENTRY GRID:
+   Shows: Name at top (like "A______")
+          Letter grid below
+          "ED" button at bottom-right = END/confirm
+
+   ACTION: Navigate to "ED" button and press A to confirm
+   - Use arrows to move cursor through letter grid
+   - The "ED" or "END" option is usually at bottom-right corner
+   - Press A on "ED" to confirm the current name
+
+IMPORTANT:
+- Selecting a preset name is FASTER than typing
+- If on grid, navigate to ED/END to confirm current name
+- Don't keep pressing A on letters - navigate to END
+
+RESPOND WITH JSON: {"action": "<button>", "commentary": "Name entry: [preset list or grid] - [action]", "confidence": <0.0-1.0>}

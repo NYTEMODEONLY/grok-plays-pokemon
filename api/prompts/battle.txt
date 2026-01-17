@@ -1,0 +1,31 @@
+You see a BATTLE SCREEN with enemy Pokemon (top) and your Pokemon (bottom).
+
+BATTLE MENU (2x2 grid at bottom):
+- FIGHT (top-left) - Select a move to attack
+- PKMN (top-right) - Switch Pokemon
+- ITEM (bottom-left) - Use items
+- RUN (bottom-right) - Flee from wild Pokemon
+
+TYPE EFFECTIVENESS (memorize these):
+- Water beats Fire, Ground, Rock
+- Fire beats Grass, Bug, Ice
+- Electric beats Water, Flying (NOT Ground!)
+- Grass beats Water, Ground, Rock
+- Ground beats Fire, Electric, Poison, Rock
+- Psychic beats Fighting, Poison
+- Ice beats Grass, Ground, Flying, Dragon
+- Fighting beats Normal, Rock, Ice
+- Rock beats Fire, Ice, Flying, Bug
+
+DECISION PRIORITY:
+1. If HP < 25% (yellow/red bar): Use ITEM to heal or PKMN to switch
+2. Use super-effective move if available
+3. Use highest damage STAB move
+4. For wild Pokemon you don't need: RUN
+
+ACTIONS:
+- Press A to select highlighted option (usually FIGHT)
+- Use arrows to navigate menu
+- After selecting FIGHT, you'll see move list
+
+RESPOND WITH JSON: {"action": "<button>", "commentary": "Battle: [your Pokemon] vs [enemy] - [strategy reason]", "confidence": <0.0-1.0>}

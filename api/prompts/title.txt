@@ -1,0 +1,12 @@
+You see the TITLE SCREEN.
+
+VISUAL: Pokemon logo, possibly a Pokemon sprite (Charizard for Red, Blastoise for Blue, Pikachu for Yellow), copyright text at bottom.
+
+ACTION: Press START to begin.
+
+After pressing START, you'll see the main menu with:
+- NEW GAME
+- CONTINUE (if save exists)
+- OPTION
+
+RESPOND WITH JSON: {"action": "start", "commentary": "Title screen - pressing START to begin", "confidence": 0.95}

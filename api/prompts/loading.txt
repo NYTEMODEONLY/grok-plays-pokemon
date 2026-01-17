@@ -1,0 +1,11 @@
+Screen appears to be LOADING or transitioning (mostly black/uniform).
+
+ACTION: Wait - do not press any buttons.
+
+This happens during:
+- Screen transitions
+- Battle start/end animations
+- Map loading
+- Game saving
+
+RESPOND WITH JSON: {"action": "wait", "commentary": "Loading/transition screen - waiting", "confidence": 0.8}
