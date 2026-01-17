@@ -38,14 +38,25 @@ class ScreenDetector {
      * @returns {Object} { screenType: string, confidence: number, features: object }
      */
     detect(canvas) {
+        // [DIAG] Log detection attempt
+        console.log('[DIAG] detect() called with canvas:', canvas ? `${canvas.width}x${canvas.height}` : 'null');
+
         if (!canvas) {
-            return { screenType: 'unknown', confidence: 0, features: {} };
+            console.error('[DIAG] No canvas provided to detect()');
+            return { screenType: 'unknown', confidence: 0, features: {}, error: 'no_canvas', errorMsg: 'Canvas element is null or undefined' };
+        }
+
+        if (canvas.width === 0 || canvas.height === 0) {
+            console.error('[DIAG] Canvas has zero dimensions:', canvas.width, 'x', canvas.height);
+            return { screenType: 'unknown', confidence: 0, features: {}, error: 'zero_dimensions', errorMsg: `Canvas is ${canvas.width}x${canvas.height}` };
         }
 
         const ctx = canvas.getContext('2d', { willReadFrequently: true });
         if (!ctx) {
-            return { screenType: 'unknown', confidence: 0, features: {} };
+            console.error('[DIAG] Failed to get 2d context from canvas');
+            return { screenType: 'unknown', confidence: 0, features: {}, error: 'no_context', errorMsg: 'getContext("2d") returned null' };
         }
+        console.log('[DIAG] Got 2d context successfully');
 
         const width = canvas.width;
         const height = canvas.height;
@@ -54,13 +65,18 @@ class ScreenDetector {
         let imageData;
         try {
             imageData = ctx.getImageData(0, 0, width, height);
+            console.log('[DIAG] getImageData succeeded, data length:', imageData.data.length);
         } catch (e) {
             // CORS error - canvas is tainted
-            return { screenType: 'unknown', confidence: 0, features: {}, error: 'canvas_tainted' };
+            console.error('[DIAG] getImageData FAILED:', e.name, e.message);
+            return { screenType: 'unknown', confidence: 0, features: {}, error: 'canvas_tainted', errorMsg: e.message };
         }
 
         const features = this.extractFeatures(imageData, width, height);
+        console.log('[DIAG] Extracted features:', JSON.stringify(features));
+
         const screenType = this.classifyScreen(features);
+        console.log('[DIAG] Classification result:', screenType.type, 'confidence:', screenType.confidence);
 
         this.lastScreenType = screenType.type;
         this.screenTypeConfidence = screenType.confidence;

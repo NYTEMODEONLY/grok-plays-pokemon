@@ -323,6 +323,14 @@
                                     <span class="debug-label">Confidence:</span>
                                     <span class="debug-value" id="debug-confidence">-</span>
                                 </div>
+                                <div class="debug-row" id="debug-error-row" style="display:none">
+                                    <span class="debug-label">Error:</span>
+                                    <span class="debug-value error" id="debug-error">-</span>
+                                </div>
+                                <div class="debug-row">
+                                    <span class="debug-label">Canvas:</span>
+                                    <span class="debug-value" id="debug-canvas-info">-</span>
+                                </div>
                                 <div class="debug-row">
                                     <span class="debug-label">OCR Status:</span>
                                     <span class="debug-value" id="debug-ocr-status">-</span>
@@ -332,6 +340,7 @@
                                     <span class="debug-value" id="debug-last-action">-</span>
                                 </div>
                                 <div class="ocr-preview" id="debug-ocr-text">OCR text will appear here...</div>
+                                <div class="ocr-preview" id="debug-features" style="font-size:9px; color:#666;">Features will appear here...</div>
                             </div>
                             <div id="game"></div>
                             <div class="action-display">
@@ -704,22 +713,49 @@
 
         // Get canvas from EmulatorJS
         function getGameCanvas() {
-            let canvas = document.querySelector('#game canvas');
-            if (!canvas) {
-                const iframe = document.querySelector('#game iframe');
-                if (iframe && iframe.contentDocument) {
-                    canvas = iframe.contentDocument.querySelector('canvas');
+            // [DIAG] Log all canvas elements found
+            const allCanvases = document.querySelectorAll('#game canvas');
+            const iframeCanvases = [];
+            const iframe = document.querySelector('#game iframe');
+            if (iframe && iframe.contentDocument) {
+                try {
+                    const iframeCanvas = iframe.contentDocument.querySelectorAll('canvas');
+                    iframeCanvas.forEach(c => iframeCanvases.push(c));
+                } catch (e) {
+                    console.log('[DIAG] Cannot access iframe content (CORS):', e.message);
                 }
             }
+
+            console.log('[DIAG] Canvas search - Direct:', allCanvases.length, 'Iframe:', iframeCanvases.length);
+
+            let canvas = document.querySelector('#game canvas');
+            if (!canvas && iframeCanvases.length > 0) {
+                canvas = iframeCanvases[0];
+            }
+
+            if (canvas) {
+                console.log('[DIAG] Selected canvas:', canvas.width, 'x', canvas.height,
+                    'Context test:', canvas.getContext('2d') ? '2d OK' : '2d FAIL');
+            } else {
+                console.log('[DIAG] No canvas found!');
+            }
+
             return canvas;
         }
 
         // Perform screen detection
         function detectScreen(canvas) {
-            if (!screenDetector || !canvas) {
-                return { screenType: 'unknown', confidence: 0, features: {} };
+            if (!screenDetector) {
+                console.error('[DIAG] screenDetector not initialized');
+                return { screenType: 'unknown', confidence: 0, features: {}, error: 'no_detector', errorMsg: 'ScreenDetector not initialized' };
             }
-            return screenDetector.detect(canvas);
+            if (!canvas) {
+                console.error('[DIAG] detectScreen called with no canvas');
+                return { screenType: 'unknown', confidence: 0, features: {}, error: 'no_canvas', errorMsg: 'No canvas passed to detectScreen' };
+            }
+            const result = screenDetector.detect(canvas);
+            console.log('[DIAG] Detection result:', JSON.stringify(result));
+            return result;
         }
 
         // Perform OCR (async, cached)
@@ -771,20 +807,47 @@
             try {
                 const canvas = getGameCanvas();
                 if (!canvas) {
-                    console.log('Waiting for emulator canvas...');
+                    console.log('[DIAG] Waiting for emulator canvas...');
+                    updateDebugDisplay('Canvas', 'NOT FOUND', 'debug-canvas-info', 'error');
                     return;
                 }
+
+                // Update canvas info in debug overlay
+                updateDebugDisplay('Canvas', `${canvas.width}x${canvas.height}`, 'debug-canvas-info');
 
                 // 1. Perform screen detection
                 const detection = detectScreen(canvas);
                 lastScreenType = detection.screenType;
 
                 // Update debug display
-                updateDebugDisplay('Type', detection.screenType, 'debug-screen-type');
+                updateDebugDisplay('Type', detection.screenType, 'debug-screen-type',
+                    detection.error ? 'error' : '');
                 updateDebugDisplay('Confidence', (detection.confidence * 100).toFixed(0) + '%', 'debug-confidence',
                     detection.confidence < 0.5 ? 'warning' : '');
+
+                // Show/hide error row based on whether there's an error
+                const errorRow = document.getElementById('debug-error-row');
+                if (detection.error) {
+                    errorRow.style.display = 'flex';
+                    updateDebugDisplay('Error', `${detection.error}: ${detection.errorMsg || ''}`, 'debug-error', 'error');
+                    console.error('[DIAG] Detection error:', detection.error, detection.errorMsg);
+                } else {
+                    errorRow.style.display = 'none';
+                }
+
+                // Show features in debug overlay
+                if (detection.features && Object.keys(detection.features).length > 0) {
+                    const featuresEl = document.getElementById('debug-features');
+                    const featureStr = Object.entries(detection.features)
+                        .map(([k, v]) => `${k}:${typeof v === 'boolean' ? (v ? '✓' : '✗') : v.toFixed ? v.toFixed(1) : v}`)
+                        .join(' | ');
+                    featuresEl.textContent = featureStr;
+                }
+
                 document.getElementById('detected-screen').textContent =
-                    `${detection.screenType} (${(detection.confidence * 100).toFixed(0)}%)`;
+                    detection.error
+                        ? `ERROR: ${detection.error}`
+                        : `${detection.screenType} (${(detection.confidence * 100).toFixed(0)}%)`;
 
                 // 2. Perform OCR (async, non-blocking for next iteration)
                 const ocrText = await performOCR(canvas, detection.screenType);
