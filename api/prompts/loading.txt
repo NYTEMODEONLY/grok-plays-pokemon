@@ -1,11 +1,12 @@
-Screen appears to be LOADING or transitioning (mostly black/uniform).
+Screen was classified as "loading" but this detection may be incorrect.
 
-ACTION: Wait - do not press any buttons.
+IMPORTANT: Actually look at the screenshot and determine what's shown:
+- If you see the Pokemon title screen with logo → press START
+- If you see a name entry grid with letters → navigate and select
+- If you see dialog text → press A to advance
+- If you see a menu → make a selection
+- If truly a black/loading screen → wait
 
-This happens during:
-- Screen transitions
-- Battle start/end animations
-- Map loading
-- Game saving
+Do NOT assume loading. Analyze what you actually see in the screenshot.
 
-RESPOND WITH JSON: {"action": "wait", "commentary": "Loading/transition screen - waiting", "confidence": 0.8}
+RESPOND WITH JSON: {"action": "<button>", "commentary": "<what you actually see>", "confidence": <0.0-1.0>}

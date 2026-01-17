@@ -64,14 +64,9 @@ class GameState:
                 'suggested_action': 'wait'
             }
 
-        # If screen is loading, only wait is valid
-        if self.screen_type == 'loading':
-            if action != 'wait':
-                return {
-                    'valid': False,
-                    'reason': 'Screen is loading, should wait',
-                    'suggested_action': 'wait'
-                }
+        # NOTE: Removed forced wait for 'loading' screens because client-side
+        # detection is broken and misclassifies everything as loading.
+        # Let the AI decide based on the actual screenshot.
 
         # Check for screen type mismatch
         if ai_screen_type and self.screen_confidence > 0.7:
