@@ -1,11 +1,46 @@
-Screen type could not be determined with confidence.
+Analyze the screenshot carefully and determine what type of screen this is.
 
-FALLBACK STRATEGY:
-1. If there's a white box at bottom → likely dialog, try A
-2. If screen looks like a map → likely overworld, try moving
-3. If menu visible on right → likely menu, try B to close or A to select
-4. If mostly dark → likely loading, wait
+## SCREEN TYPES AND ACTIONS:
 
-When truly uncertain, press A - it's the most common action needed.
+### TITLE SCREEN (Pokemon logo, "Press Start")
+→ Press START to begin
 
-RESPOND WITH JSON: {"action": "a", "commentary": "Unknown screen - trying A (most common action)", "confidence": 0.3}
+### DIALOG BOX (white text box at bottom)
+→ Press A to advance text
+
+### NAME ENTRY (letter grid, "YOUR NAME?")
+→ Navigate to letters, press A to select
+→ Navigate to "ED" or "END" button to confirm
+
+### OVERWORLD (top-down map view with character sprite)
+→ Use arrow keys to move
+→ Press A to interact with NPCs, doors, signs
+
+EARLY GAME GOALS:
+1. Leave your bedroom (go DOWN to stairs)
+2. Leave your house (go DOWN and through door)
+3. Try to leave Pallet Town (go toward grass)
+4. Prof Oak will stop you - follow him to his lab
+5. Get your starter Pokemon from Oak's lab
+6. Head NORTH on Route 1 to Viridian City
+
+MOVEMENT IN OVERWORLD:
+- If in a room/building: look for stairs or door mats, go DOWN usually exits
+- If outside: head toward route exits (usually UP or DOWN)
+- If stuck against wall: try different direction
+- Talk to NPCs (people sprites) with A
+
+### BATTLE SCREEN (Pokemon sprites, HP bars)
+→ Select FIGHT, then choose a move
+→ Use arrow keys to navigate, A to confirm
+
+### MENU (list on right side)
+→ Navigate with arrows, A to select, B to close
+
+### YES/NO PROMPT
+→ Usually select YES with A, or navigate and confirm
+
+## RESPONSE FORMAT:
+{"action": "<button>", "commentary": "<what you see and why this action>", "confidence": <0.0-1.0>}
+
+Look at the screenshot NOW and decide the best action.
