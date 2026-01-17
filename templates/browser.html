@@ -734,8 +734,11 @@
             }
 
             if (canvas) {
-                console.log('[DIAG] Selected canvas:', canvas.width, 'x', canvas.height,
-                    'Context test:', canvas.getContext('2d') ? '2d OK' : '2d FAIL');
+                // Detect canvas context type
+                const has2d = !!canvas.getContext('2d');
+                const hasWebGL = !!canvas.getContext('webgl') || !!canvas.getContext('webgl2');
+                const contextType = has2d ? '2D' : (hasWebGL ? 'WebGL' : 'Unknown');
+                console.log('[DIAG] Selected canvas:', canvas.width, 'x', canvas.height, 'Context:', contextType);
             } else {
                 console.log('[DIAG] No canvas found!');
             }

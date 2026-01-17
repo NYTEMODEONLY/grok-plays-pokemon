@@ -51,25 +51,21 @@ class ScreenDetector {
             return { screenType: 'unknown', confidence: 0, features: {}, error: 'zero_dimensions', errorMsg: `Canvas is ${canvas.width}x${canvas.height}` };
         }
 
-        const ctx = canvas.getContext('2d', { willReadFrequently: true });
-        if (!ctx) {
-            console.error('[DIAG] Failed to get 2d context from canvas');
-            return { screenType: 'unknown', confidence: 0, features: {}, error: 'no_context', errorMsg: 'getContext("2d") returned null' };
-        }
-        console.log('[DIAG] Got 2d context successfully');
-
         const width = canvas.width;
         const height = canvas.height;
 
-        // Get pixel data
+        // Get pixel data - handle both 2D and WebGL canvases
         let imageData;
         try {
-            imageData = ctx.getImageData(0, 0, width, height);
-            console.log('[DIAG] getImageData succeeded, data length:', imageData.data.length);
+            imageData = this.getPixelData(canvas, width, height);
+            if (!imageData) {
+                console.error('[DIAG] getPixelData returned null');
+                return { screenType: 'unknown', confidence: 0, features: {}, error: 'no_pixel_data', errorMsg: 'Could not extract pixel data' };
+            }
+            console.log('[DIAG] getPixelData succeeded, data length:', imageData.data.length);
         } catch (e) {
-            // CORS error - canvas is tainted
-            console.error('[DIAG] getImageData FAILED:', e.name, e.message);
-            return { screenType: 'unknown', confidence: 0, features: {}, error: 'canvas_tainted', errorMsg: e.message };
+            console.error('[DIAG] getPixelData FAILED:', e.name, e.message);
+            return { screenType: 'unknown', confidence: 0, features: {}, error: 'pixel_extraction_failed', errorMsg: e.message };
         }
 
         const features = this.extractFeatures(imageData, width, height);
@@ -86,6 +82,54 @@ class ScreenDetector {
             confidence: screenType.confidence,
             features: features
         };
+    }
+
+    /**
+     * Get pixel data from canvas, handling both 2D and WebGL contexts
+     * @param {HTMLCanvasElement} canvas - Source canvas (may be WebGL)
+     * @param {number} width - Canvas width
+     * @param {number} height - Canvas height
+     * @returns {ImageData} Pixel data
+     */
+    getPixelData(canvas, width, height) {
+        // First, try to get 2D context directly
+        let ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+        if (ctx) {
+            console.log('[DIAG] Using direct 2D context');
+            return ctx.getImageData(0, 0, width, height);
+        }
+
+        // Canvas is likely WebGL - create temporary 2D canvas and copy
+        console.log('[DIAG] 2D context unavailable, using temp canvas for WebGL');
+
+        // Reuse temp canvas if already created, or create new one
+        if (!this._tempCanvas) {
+            this._tempCanvas = document.createElement('canvas');
+        }
+
+        const tempCanvas = this._tempCanvas;
+        tempCanvas.width = width;
+        tempCanvas.height = height;
+
+        const tempCtx = tempCanvas.getContext('2d', { willReadFrequently: true });
+        if (!tempCtx) {
+            console.error('[DIAG] Failed to get temp canvas 2D context');
+            return null;
+        }
+
+        // Draw the WebGL canvas onto our 2D temp canvas
+        // This works because drawImage() can accept any canvas as source
+        try {
+            tempCtx.drawImage(canvas, 0, 0);
+            console.log('[DIAG] Drew WebGL canvas to temp 2D canvas');
+        } catch (e) {
+            console.error('[DIAG] drawImage failed:', e.message);
+            return null;
+        }
+
+        // Now read pixels from the temp canvas
+        return tempCtx.getImageData(0, 0, width, height);
     }
 
     /**
