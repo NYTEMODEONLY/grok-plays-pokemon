@@ -31,8 +31,5 @@
       "src": "/",
       "dest": "/templates/browser.html"
     }
-  ],
-  "env": {
-    "XAI_API_KEY": "@xai_api_key"
-  }
+  ]
 }
