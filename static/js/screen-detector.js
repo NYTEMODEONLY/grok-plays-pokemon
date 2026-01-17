@@ -33,11 +33,11 @@ class ScreenDetector {
     }
 
     /**
-     * Detect screen type from canvas
+     * Detect screen type from canvas (async for WebGL support)
      * @param {HTMLCanvasElement} canvas - The game canvas
-     * @returns {Object} { screenType: string, confidence: number, features: object }
+     * @returns {Promise<Object>} { screenType: string, confidence: number, features: object }
      */
-    detect(canvas) {
+    async detect(canvas) {
         // [DIAG] Log detection attempt
         console.log('[DIAG] detect() called with canvas:', canvas ? `${canvas.width}x${canvas.height}` : 'null');
 
@@ -57,7 +57,7 @@ class ScreenDetector {
         // Get pixel data - handle both 2D and WebGL canvases
         let imageData;
         try {
-            imageData = this.getPixelData(canvas, width, height);
+            imageData = await this.getPixelData(canvas, width, height);
             if (!imageData) {
                 console.error('[DIAG] getPixelData returned null');
                 return { screenType: 'unknown', confidence: 0, features: {}, error: 'no_pixel_data', errorMsg: 'Could not extract pixel data' };
@@ -86,12 +86,14 @@ class ScreenDetector {
 
     /**
      * Get pixel data from canvas, handling both 2D and WebGL contexts
+     * WebGL canvases need toDataURL() because drawImage() returns blank
+     * due to preserveDrawingBuffer being false by default
      * @param {HTMLCanvasElement} canvas - Source canvas (may be WebGL)
      * @param {number} width - Canvas width
      * @param {number} height - Canvas height
-     * @returns {ImageData} Pixel data
+     * @returns {Promise<ImageData>} Pixel data
      */
-    getPixelData(canvas, width, height) {
+    async getPixelData(canvas, width, height) {
         // First, try to get 2D context directly
         let ctx = canvas.getContext('2d', { willReadFrequently: true });
 
@@ -100,36 +102,55 @@ class ScreenDetector {
             return ctx.getImageData(0, 0, width, height);
         }
 
-        // Canvas is likely WebGL - create temporary 2D canvas and copy
-        console.log('[DIAG] 2D context unavailable, using temp canvas for WebGL');
+        // Canvas is WebGL - use toDataURL + Image to capture frame
+        // drawImage() doesn't work because preserveDrawingBuffer is false
+        console.log('[DIAG] 2D context unavailable, using toDataURL for WebGL');
 
-        // Reuse temp canvas if already created, or create new one
-        if (!this._tempCanvas) {
-            this._tempCanvas = document.createElement('canvas');
-        }
+        return new Promise((resolve, reject) => {
+            try {
+                // Capture the current frame as data URL
+                const dataUrl = canvas.toDataURL('image/png');
+                console.log('[DIAG] Got dataURL, length:', dataUrl.length);
 
-        const tempCanvas = this._tempCanvas;
-        tempCanvas.width = width;
-        tempCanvas.height = height;
+                // Load into an Image element
+                const img = new Image();
+                img.onload = () => {
+                    // Create temp canvas if needed
+                    if (!this._tempCanvas) {
+                        this._tempCanvas = document.createElement('canvas');
+                    }
 
-        const tempCtx = tempCanvas.getContext('2d', { willReadFrequently: true });
-        if (!tempCtx) {
-            console.error('[DIAG] Failed to get temp canvas 2D context');
-            return null;
-        }
+                    const tempCanvas = this._tempCanvas;
+                    tempCanvas.width = width;
+                    tempCanvas.height = height;
 
-        // Draw the WebGL canvas onto our 2D temp canvas
-        // This works because drawImage() can accept any canvas as source
-        try {
-            tempCtx.drawImage(canvas, 0, 0);
-            console.log('[DIAG] Drew WebGL canvas to temp 2D canvas');
-        } catch (e) {
-            console.error('[DIAG] drawImage failed:', e.message);
-            return null;
-        }
+                    const tempCtx = tempCanvas.getContext('2d', { willReadFrequently: true });
+                    if (!tempCtx) {
+                        console.error('[DIAG] Failed to get temp canvas 2D context');
+                        reject(new Error('Failed to get temp canvas context'));
+                        return;
+                    }
 
-        // Now read pixels from the temp canvas
-        return tempCtx.getImageData(0, 0, width, height);
+                    // Draw image to temp canvas
+                    tempCtx.drawImage(img, 0, 0);
+                    console.log('[DIAG] Drew image to temp canvas');
+
+                    // Read pixels
+                    const imageData = tempCtx.getImageData(0, 0, width, height);
+                    resolve(imageData);
+                };
+
+                img.onerror = (e) => {
+                    console.error('[DIAG] Image load failed');
+                    reject(new Error('Failed to load image from dataURL'));
+                };
+
+                img.src = dataUrl;
+            } catch (e) {
+                console.error('[DIAG] toDataURL failed:', e.message);
+                reject(e);
+            }
+        });
     }
 
     /**

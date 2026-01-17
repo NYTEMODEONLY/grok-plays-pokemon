@@ -746,8 +746,8 @@
             return canvas;
         }
 
-        // Perform screen detection
-        function detectScreen(canvas) {
+        // Perform screen detection (async for WebGL support)
+        async function detectScreen(canvas) {
             if (!screenDetector) {
                 console.error('[DIAG] screenDetector not initialized');
                 return { screenType: 'unknown', confidence: 0, features: {}, error: 'no_detector', errorMsg: 'ScreenDetector not initialized' };
@@ -756,7 +756,7 @@
                 console.error('[DIAG] detectScreen called with no canvas');
                 return { screenType: 'unknown', confidence: 0, features: {}, error: 'no_canvas', errorMsg: 'No canvas passed to detectScreen' };
             }
-            const result = screenDetector.detect(canvas);
+            const result = await screenDetector.detect(canvas);
             console.log('[DIAG] Detection result:', JSON.stringify(result));
             return result;
         }
@@ -818,8 +818,8 @@
                 // Update canvas info in debug overlay
                 updateDebugDisplay('Canvas', `${canvas.width}x${canvas.height}`, 'debug-canvas-info');
 
-                // 1. Perform screen detection
-                const detection = detectScreen(canvas);
+                // 1. Perform screen detection (async for WebGL canvas)
+                const detection = await detectScreen(canvas);
                 lastScreenType = detection.screenType;
 
                 // Update debug display
